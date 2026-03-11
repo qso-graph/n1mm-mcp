@@ -201,6 +201,11 @@ class StateEngine:
         self._stations_lock = threading.Lock()
         self._stations: dict[str, StationState] = {}
 
+        # Callsign → StationName mapping (fixes dynamicresults partition split).
+        # RadioInfo carries mycall + StationName; dynamicresults only has call.
+        # This map lets us route Score packets to the correct station.
+        self._call_to_station: dict[str, str] = {}
+
         self.parse_errors = ParseErrors()
         self.packets_received: int = 0
         self.last_packet_at: datetime | None = None
@@ -234,7 +239,13 @@ class StateEngine:
         """
         with self._stations_lock:
             if station_name is not None:
-                return self._stations.get(station_name)
+                # Direct match first, then try callsign→station mapping
+                station = self._stations.get(station_name)
+                if station is None:
+                    resolved = self._call_to_station.get(station_name)
+                    if resolved:
+                        station = self._stations.get(resolved)
+                return station
             if len(self._stations) == 1:
                 return next(iter(self._stations.values()))
             return None
@@ -268,6 +279,9 @@ class StateEngine:
     def handle_radioinfo(self, station_name: str, radio: RadioState) -> None:
         station = self._get_or_create_station(station_name)
         station.update_radio(radio)
+        # Register mycall → StationName so Score packets route correctly
+        if radio.mycall:
+            self._call_to_station[radio.mycall] = station_name
 
     def handle_contactinfo(self, station_name: str, contact: Contact) -> None:
         station = self._get_or_create_station(station_name)
@@ -291,8 +305,21 @@ class StateEngine:
             station.evict_stale_spots()
 
     def handle_score(self, station_name: str, score: ScoreState) -> None:
-        station = self._get_or_create_station(station_name)
+        # dynamicresults lacks <StationName> — listener passes call as station_name.
+        # Map to real station via _call_to_station (populated by RadioInfo).
+        resolved = self._call_to_station.get(station_name, station_name)
+        station = self._get_or_create_station(resolved)
         station.update_score(score)
+        # Backfill contest_name from Score if AppInfo never arrived
+        if score.contest:
+            with station.radio_lock:
+                if not station.station_info.contest_name:
+                    station.station_info.contest_name = score.contest
+                    logger.info(
+                        "Contest name backfilled from Score: %s (station %s)",
+                        score.contest,
+                        resolved,
+                    )
 
     def handle_lookup(self, station_name: str, lookup: LookupState) -> None:
         station = self._get_or_create_station(station_name)

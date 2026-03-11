@@ -1,6 +1,6 @@
 [project]
 name = "n1mm-mcp"
-version = "0.1.1"
+version = "0.1.2"
 description = "MCP server for N1MM Logger+ — live contest state via UDP broadcast"
 readme = "README.md"
 license = {text = "GPL-3.0-or-later"}
