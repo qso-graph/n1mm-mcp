@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-from .frequency import freq_to_band, from_mhz_str, from_tens_hz
+from .frequency import freq_to_band, from_spot_freq, from_tens_hz
 from .models import (
     Contact,
     LookupState,
@@ -131,7 +131,7 @@ class StationState:
             # Don't remove from contact_log — mark as deleted via delete_log
 
     def add_spot(self, spot: Spot) -> None:
-        band = freq_to_band(from_mhz_str(spot.frequency))
+        band = freq_to_band(from_spot_freq(spot.frequency))
         with self.spot_lock:
             if spot.action == "delete":
                 self.spot_map.pop((spot.dxcall, band), None)

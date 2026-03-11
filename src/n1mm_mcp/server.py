@@ -16,7 +16,7 @@ from typing import Any
 from fastmcp import FastMCP
 
 from . import __version__
-from .frequency import freq_to_band, from_mhz_str, from_tens_hz
+from .frequency import freq_to_band, from_spot_freq, from_tens_hz
 from .state import (
     DEFAULT_HEARTBEAT_TIMEOUT,
     DEFAULT_MAX_SPOTS,
@@ -347,7 +347,7 @@ def n1mm_bandmap(
     # Filter
     filtered = spots
     if band:
-        filtered = [s for s in filtered if freq_to_band(from_mhz_str(s.frequency)) == band]
+        filtered = [s for s in filtered if freq_to_band(from_spot_freq(s.frequency)) == band]
     if mode:
         filtered = [s for s in filtered if s.mode.upper() == mode.upper()]
     if callsign:
@@ -362,8 +362,8 @@ def n1mm_bandmap(
         spot_list.append(
             {
                 "dxcall": s.dxcall,
-                "frequency_mhz": from_mhz_str(s.frequency),
-                "band": freq_to_band(from_mhz_str(s.frequency)),
+                "frequency_mhz": from_spot_freq(s.frequency),
+                "band": freq_to_band(from_spot_freq(s.frequency)),
                 "mode": s.mode,
                 "spotter": s.spotter_call,
                 "status": s.status,
@@ -381,7 +381,7 @@ def n1mm_bandmap(
     with station.spot_lock:
         for s in station.spot_buffer:
             if (now - s.received_at).total_seconds() < 1800:  # 30 min window
-                b = freq_to_band(from_mhz_str(s.frequency))
+                b = freq_to_band(from_spot_freq(s.frequency))
                 band_activity[b] = band_activity.get(b, 0) + 1
 
     return {
@@ -592,13 +592,13 @@ def n1mm_multipliers(
     with station.spot_lock:
         for spot in station.spot_map.values():
             if "mult" in spot.status_list.lower():
-                spot_band = freq_to_band(from_mhz_str(spot.frequency))
+                spot_band = freq_to_band(from_spot_freq(spot.frequency))
                 if band and spot_band != band:
                     continue
                 needs.append(
                     {
                         "dxcall": spot.dxcall,
-                        "frequency_mhz": from_mhz_str(spot.frequency),
+                        "frequency_mhz": from_spot_freq(spot.frequency),
                         "band": spot_band,
                         "status": spot.status,
                     }

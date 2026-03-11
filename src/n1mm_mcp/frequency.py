@@ -37,15 +37,26 @@ def from_tens_hz(val: int) -> float:
     return round(val / 100000.0, 4)
 
 
-def from_mhz_str(val: str) -> float:
-    """Convert N1MM MHz string (from Spot) to float.
+def from_spot_freq(val: str) -> float:
+    """Convert N1MM Spot frequency string to MHz.
 
-    "14.195" → 14.1950
+    N1MM Spot packets send frequency as kHz (e.g., "14195.0", "24915.0"),
+    NOT MHz as the documentation suggests. Detect the format by range:
+      - If > 1000, it's kHz → divide by 1000
+      - If <= 1000, it's MHz → use as-is
+
+    "14195.0" → 14.1950  (kHz input)
+    "14.195"  → 14.1950  (MHz input, unlikely but handled)
     """
     try:
-        return round(float(val), 4)
+        freq = float(val)
     except (ValueError, TypeError):
         return 0.0
+    if freq <= 0.0:
+        return 0.0
+    if freq > 1000.0:
+        freq = freq / 1000.0
+    return round(freq, 4)
 
 
 def freq_to_band(freq_mhz: float) -> str:
