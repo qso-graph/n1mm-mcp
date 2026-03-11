@@ -264,6 +264,8 @@ class UDPListener:
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        if hasattr(socket, "SO_REUSEPORT"):
+            self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
         self._sock.settimeout(1.0)  # allow periodic stop check
         self._sock.bind((self.bind_addr, self.port))
         logger.info("UDP listener bound to %s:%d", self.bind_addr, self.port)
