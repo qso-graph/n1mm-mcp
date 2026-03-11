@@ -36,7 +36,8 @@ pip install n1mm-mcp
 {
   "mcpServers": {
     "n1mm": {
-      "command": "n1mm-mcp"
+      "command": "uvx",
+      "args": ["n1mm-mcp"]
     }
   }
 }
@@ -45,7 +46,7 @@ pip install n1mm-mcp
 ### Claude Code
 
 ```bash
-claude mcp add n1mm-mcp -- n1mm-mcp
+claude mcp add n1mm -- uvx n1mm-mcp
 ```
 
 ## Architecture
