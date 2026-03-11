@@ -298,13 +298,32 @@ def n1mm_contacts(
 
         deletes = list(station.delete_log)
 
-    return {
+    result: dict[str, Any] = {
         "total_qsos": total,
         "last_qso": last_qso,
         "recent_qsos": qso_list,
         "recent_edits": edits[-10:],
         "recent_deletes": deletes[-10:],
     }
+
+    # Cross-reference Score XML — surface discrepancy if QSOs were logged
+    # before the MCP server started (UDP-only limitation)
+    with station.score_lock:
+        if station.score_state:
+            score_qsos = sum(station.score_state.band_mode_qsos.values())
+            if score_qsos > total:
+                result["score_discrepancy"] = {
+                    "score_xml_qsos": score_qsos,
+                    "observed_qsos": total,
+                    "missed": score_qsos - total,
+                    "reason": (
+                        "QSOs were logged before the MCP server started. "
+                        "Score XML reports cumulative totals but individual "
+                        "contact details are only available for QSOs observed live."
+                    ),
+                }
+
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -501,7 +520,7 @@ def n1mm_performance(
         run_points = sum(c.points for c in log if c.is_run_qso)
         sp_points = sum(c.points for c in log if not c.is_run_qso)
 
-    return {
+    result: dict[str, Any] = {
         "score": score_data,
         "rate": {
             "rate_10m": rate_10m,
@@ -521,6 +540,21 @@ def n1mm_performance(
         },
         "total_qsos": total,
     }
+
+    # Flag discrepancy between Score XML and observed contacts
+    score_total = score_data.get("total_qsos", 0)
+    if score_total > total:
+        result["score_discrepancy"] = {
+            "score_xml_qsos": score_total,
+            "observed_qsos": total,
+            "missed": score_total - total,
+            "reason": (
+                "Rate, breakdown, and run/S&P stats reflect only QSOs "
+                "observed live. Score totals come from N1MM's cumulative XML."
+            ),
+        }
+
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -621,6 +655,24 @@ def n1mm_multipliers(
     if band:
         result["filter_band"] = band
 
+    # Cross-reference Score XML for discrepancy
+    with station.score_lock:
+        if station.score_state:
+            score_qsos = sum(station.score_state.band_mode_qsos.values())
+            with station.contact_lock:
+                observed = len(station.contact_log)
+            if score_qsos > observed:
+                result["score_discrepancy"] = {
+                    "score_xml_qsos": score_qsos,
+                    "observed_qsos": observed,
+                    "missed": score_qsos - observed,
+                    "reason": (
+                        "Multiplier data is only available for QSOs observed "
+                        "live. Score XML reports %d QSOs but only %d were "
+                        "seen by the MCP server." % (score_qsos, observed)
+                    ),
+                }
+
     return result
 
 
@@ -659,6 +711,21 @@ def n1mm_clock(
         total = len(log)
 
         if not log:
+            # Check Score XML before claiming "no contacts"
+            with station.score_lock:
+                if station.score_state:
+                    score_qsos = sum(station.score_state.band_mode_qsos.values())
+                    if score_qsos > 0:
+                        return {
+                            "status": "no_observed_contacts",
+                            "message": (
+                                "No contacts observed live, but Score XML "
+                                "reports %d QSOs logged before the MCP server "
+                                "started. Timing and pacing data require live "
+                                "contact observation." % score_qsos
+                            ),
+                            "score_xml_qsos": score_qsos,
+                        }
             return {"status": "no_contacts", "message": "No contacts logged yet."}
 
         first_ts = log[0].timestamp

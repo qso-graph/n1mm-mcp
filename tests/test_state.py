@@ -1,6 +1,8 @@
-"""Functional tests for StateEngine — callsign mapping and contest backfill."""
+"""Functional tests for StateEngine — callsign mapping, contest backfill, discrepancy."""
 
-from n1mm_mcp.models import RadioState, ScoreState, StationInfo
+import os
+
+from n1mm_mcp.models import Contact, RadioState, ScoreState, StationInfo
 from n1mm_mcp.state import StateEngine
 
 
@@ -120,3 +122,61 @@ class TestContestNameBackfill:
 
         station = engine.resolve_station("I9-LAPTOP")
         assert station.station_info.contest_name == "CQ-WW-CW"
+
+
+class TestScoreDiscrepancy:
+    """v0.1.4: Surface discrepancy when Score XML reports more QSOs than observed."""
+
+    def _setup_station(self) -> StateEngine:
+        engine = _engine()
+        radio = RadioState(radio_nr=1, mycall="KI7MT")
+        engine.handle_radioinfo("I9-LAPTOP", radio)
+        return engine
+
+    def test_discrepancy_when_score_exceeds_contacts(self):
+        """Score says 14 QSOs but contact_log has 0 → discrepancy surfaced."""
+        engine = self._setup_station()
+        score = ScoreState(
+            contest="POTA", call="KI7MT", score=7,
+            band_mode_qsos={("20", "PH"): 5, ("12", "FT8"): 4, ("40", "PH"): 5},
+        )
+        engine.handle_score("KI7MT", score)
+
+        station = engine.resolve_station("I9-LAPTOP")
+        assert station.score_state is not None
+        assert sum(station.score_state.band_mode_qsos.values()) == 14
+        assert len(station.contact_log) == 0
+
+    def test_no_discrepancy_when_counts_match(self):
+        """Score matches contact_log → no discrepancy."""
+        engine = self._setup_station()
+        contact = Contact(call="W1AW", rxfreq=140850000, mode="CW", guid="abc")
+        engine.handle_contactinfo("I9-LAPTOP", contact)
+        score = ScoreState(
+            contest="POTA", call="KI7MT", score=1,
+            band_mode_qsos={("20", "CW"): 1},
+        )
+        engine.handle_score("KI7MT", score)
+
+        station = engine.resolve_station("I9-LAPTOP")
+        assert sum(station.score_state.band_mode_qsos.values()) == 1
+        assert len(station.contact_log) == 1
+
+    def test_tool_contacts_surfaces_discrepancy(self):
+        """Integration: n1mm_contacts tool output includes score_discrepancy."""
+        from n1mm_mcp.server import n1mm_contacts
+        import n1mm_mcp.server as srv
+
+        engine = self._setup_station()
+        score = ScoreState(
+            contest="POTA", call="KI7MT", score=7,
+            band_mode_qsos={("20", "PH"): 5, ("12", "FT8"): 9},
+        )
+        engine.handle_score("KI7MT", score)
+        srv._state = engine
+
+        result = n1mm_contacts()
+        assert "score_discrepancy" in result
+        assert result["score_discrepancy"]["score_xml_qsos"] == 14
+        assert result["score_discrepancy"]["missed"] == 14
+        assert result["total_qsos"] == 0
