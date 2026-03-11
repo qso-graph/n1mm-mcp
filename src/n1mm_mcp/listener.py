@@ -162,7 +162,11 @@ def _parse_spot(root: ET.Element) -> tuple[str, Spot]:
 def _parse_score(root: ET.Element) -> tuple[str, ScoreState]:
     """Parse DynamicResults XML."""
     call = _text(root, "call")
-    station = call  # DynamicResults doesn't have StationName — use call
+    # DynamicResults XML lacks StationName — use call as partition key.
+    # Phase 2 NOTE: In multi-op, call may be the shared contest call (e.g. K3LR)
+    # across all stations, causing score state to land on a partition that
+    # doesn't match RadioInfo/ContactInfo partitions. Needs StationName mapping.
+    station = call
 
     score = ScoreState(
         contest=_text(root, "contest"),

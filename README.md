@@ -67,6 +67,17 @@ AI Assistant (Claude, qsp-mcp, etc.)
 - **Multi-station** — state partitioned by StationName (SO2R, multi-op)
 - **Zero auth** — no credentials needed
 
+## CLI Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--port` | `12060` | UDP listen port |
+| `--transport` | `stdio` | MCP transport (`stdio` or `streamable-http`) |
+| `--heartbeat-timeout` | `60` | Seconds before connection goes stale |
+| `--stale-timeout` | `900` | Seconds before connection goes disconnected |
+| `--max-spots` | `2000` | Maximum spots in bandmap buffer |
+| `--spot-ttl` | `30` | Spot time-to-live in **minutes** |
+
 ## Testing
 
 ```bash
