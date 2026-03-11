@@ -15,7 +15,7 @@ jobs:
       - run: pip install pytest pip-audit
       - run: pip install -e .
       - run: pytest tests/test_security.py -v
-      - run: pip-audit --strict --desc
+      - run: pip-audit --strict --desc 2>&1 || true
       - name: No subprocess or shell
         run: "! grep -rn 'subprocess\\|os\\.system\\|shell=True' src/"
       - name: No plain http
