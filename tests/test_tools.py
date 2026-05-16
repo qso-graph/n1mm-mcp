@@ -251,3 +251,53 @@ class TestIntegration:
         assert freq_to_band(14.0) == "20m"
         assert freq_to_band(14.35) == "20m"
         assert freq_to_band(13.99) == "unknown"
+
+
+# ---------------------------------------------------------------------------
+# N1MM-L2-041..045: get_version_info — fleet identity attestation
+# ---------------------------------------------------------------------------
+
+
+class TestGetVersionInfo:
+    """Tracks IONIS-AI/ionis-devel#49 — fleet get_version_info convention.
+
+    These tests don't need the UDP listener — get_version_info is the only
+    tool that returns pure metadata without consulting StateEngine. Tests
+    pin that contract.
+    """
+
+    def test_returns_service_name(self):
+        """N1MM-L2-041: payload includes service_name = 'n1mm-mcp'."""
+        from n1mm_mcp.server import _version_info_payload
+
+        assert _version_info_payload()["service_name"] == "n1mm-mcp"
+
+    def test_returns_service_version(self):
+        """N1MM-L2-042: service_version matches package __version__."""
+        from n1mm_mcp import __version__
+        from n1mm_mcp.server import _version_info_payload
+
+        assert _version_info_payload()["service_version"] == __version__
+
+    def test_returns_spec_version(self):
+        """N1MM-L2-043: spec_version pins the N1MM UDP contract."""
+        from n1mm_mcp.server import _version_info_payload
+
+        assert _version_info_payload()["spec_version"] == "n1mm-udp-v1"
+
+    def test_payload_keys_are_required_set(self):
+        """N1MM-L2-044: payload has the required keys (no extras yet)."""
+        from n1mm_mcp.server import _version_info_payload
+
+        result = _version_info_payload()
+        required = {"service_name", "service_version", "spec_version"}
+        assert required.issubset(set(result.keys()))
+
+    def test_all_values_are_strings(self):
+        """N1MM-L2-045: all returned values are strings (JSON-safe envelope)."""
+        from n1mm_mcp.server import _version_info_payload
+
+        result = _version_info_payload()
+        for k in ("service_name", "service_version", "spec_version"):
+            assert isinstance(result[k], str), f"{k} should be str, got {type(result[k])}"
+            assert result[k], f"{k} should be non-empty"

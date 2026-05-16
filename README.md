@@ -24,6 +24,7 @@ pip install n1mm-mcp
 | `n1mm_multipliers` | Mult grid, needs, value analysis |
 | `n1mm_clock` | Contest timing, off-time, pacing |
 | `n1mm_diagnostics` | Server health, parse errors, memory |
+| `get_version_info` | Service version + upstream UDP contract version (fleet identity attestation) |
 
 ## Quick Start
 

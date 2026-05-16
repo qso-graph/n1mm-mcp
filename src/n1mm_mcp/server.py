@@ -15,7 +15,7 @@ from typing import Any
 
 from fastmcp import FastMCP
 
-from . import __version__
+from . import __spec_version__, __version__
 from .frequency import freq_to_band, from_spot_freq, from_tens_hz
 from .state import (
     DEFAULT_HEARTBEAT_TIMEOUT,
@@ -77,6 +77,45 @@ def _radio_to_dict(radio) -> dict[str, Any]:
         "radio_name": radio.radio_name,
         "active_radio_nr": radio.active_radio_nr,
     }
+
+
+# ---------------------------------------------------------------------------
+# Tool 0: get_version_info — Fleet Identity Attestation
+# ---------------------------------------------------------------------------
+
+
+def _version_info_payload() -> dict[str, Any]:
+    """Build the version info envelope. Pulled into a helper so tests can
+    call it directly without going through the FastMCP wrapper.
+
+    This is the only tool that doesn't touch the UDP listener state —
+    useful as an operator self-check when N1MM isn't broadcasting.
+    """
+    return {
+        "service_name": "n1mm-mcp",
+        "service_version": __version__,
+        "spec_version": __spec_version__,
+    }
+
+
+@mcp.tool()
+def get_version_info() -> dict[str, Any]:
+    """Get n1mm-mcp service version and upstream UDP contract version.
+
+    Returns the running PyPI version of n1mm-mcp and the N1MM Logger+
+    UDP broadcast contract revision in use. Use this to confirm fleet
+    alignment across MCP deployments — agents can compare service_version
+    and spec_version across servers to detect drift without going outside
+    the MCP protocol.
+
+    Note: n1mm_diagnostics remains the canonical health probe (heartbeat,
+    parse errors, memory). get_version_info is a lighter-weight identity
+    attestation that succeeds even when N1MM isn't broadcasting.
+
+    Returns:
+        service_name, service_version (PyPI), and spec_version (UDP contract).
+    """
+    return _version_info_payload()
 
 
 # ---------------------------------------------------------------------------
