@@ -36,6 +36,10 @@ Issues = "https://github.com/qso-graph/n1mm-mcp/issues"
 [project.scripts]
 n1mm-mcp = "n1mm_mcp.server:main"
 
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

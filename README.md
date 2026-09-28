@@ -11,7 +11,8 @@ Data from N1MM Logger+'s UDP broadcasts on your local network. Part of the [qso-
 ## Install
 
 ```bash
-pip install n1mm-mcp
+uvx n1mm-mcp            # run it; nothing to install
+pip install n1mm-mcp    # or install it into your own environment
 ```
 
 ## Tools
@@ -65,7 +66,8 @@ Add to `claude_desktop_config.json` (`~/Library/Application Support/Claude/` on 
 {
   "mcpServers": {
     "n1mm": {
-      "command": "n1mm-mcp"
+      "command": "uvx",
+      "args": ["n1mm-mcp"]
     }
   }
 }
@@ -79,7 +81,8 @@ Add to `.claude/settings.json`:
 {
   "mcpServers": {
     "n1mm": {
-      "command": "n1mm-mcp"
+      "command": "uvx",
+      "args": ["n1mm-mcp"]
     }
   }
 }
@@ -91,7 +94,8 @@ Add to `.claude/settings.json`:
 {
   "mcpServers": {
     "n1mm": {
-      "command": "n1mm-mcp"
+      "command": "uvx",
+      "args": ["n1mm-mcp"]
     }
   }
 }
@@ -105,7 +109,8 @@ Add to `.cursor/mcp.json` (project-level) or `~/.cursor/mcp.json` (global):
 {
   "mcpServers": {
     "n1mm": {
-      "command": "n1mm-mcp"
+      "command": "uvx",
+      "args": ["n1mm-mcp"]
     }
   }
 }
@@ -119,7 +124,8 @@ Add to `.vscode/mcp.json` in your workspace:
 {
   "servers": {
     "n1mm": {
-      "command": "n1mm-mcp"
+      "command": "uvx",
+      "args": ["n1mm-mcp"]
     }
   }
 }
@@ -133,11 +139,14 @@ Add to `~/.gemini/settings.json` (global) or `.gemini/settings.json` (project):
 {
   "mcpServers": {
     "n1mm": {
-      "command": "n1mm-mcp"
+      "command": "uvx",
+      "args": ["n1mm-mcp"]
     }
   }
 }
 ```
+
+Installed with pip instead? Use `"command": "n1mm-mcp"` in any config above.
 
 ### Ask questions
 
@@ -182,7 +191,8 @@ Then open the MCP Inspector at `http://localhost:8008`.
 ```bash
 git clone https://github.com/qso-graph/n1mm-mcp.git
 cd n1mm-mcp
-pip install -e .
+uv sync --group dev
+uv run pytest
 ```
 
 ## License
