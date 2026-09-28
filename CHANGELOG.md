@@ -5,6 +5,27 @@ All notable changes to `n1mm-mcp` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.6] — 2026-09-28
+
+### Changed
+- README in the qso-graph layout: tools with key parameters, what N1MM Logger+ is,
+  client setup for Claude Desktop, Claude Code, ChatGPT, Cursor, VS Code and Gemini,
+  example questions.
+- `mcp-name` corrected to `io.github.qso-graph/n1mm-mcp` (the Registry checks it).
+
+### Added (CI hygiene)
+- **MCP Registry sync** — `publish.yml` now publishes to the [Official MCP Registry](https://registry.modelcontextprotocol.io)
+  after each PyPI publish, using GitHub OIDC for auth. Triggered on
+  `v*` tag push; no manual steps. Pattern documented in
+  [qso-graph/.github/TEMPLATES.md](https://github.com/qso-graph/.github/blob/main/TEMPLATES.md).
+- **Registry version badge** in README — PyPI and Registry versions
+  are visible side-by-side so any drift between publishing surfaces
+  is immediately apparent.
+- **Release gates** — the tag must match `pyproject.toml`, and a
+  `verify` job fails the release unless PyPI and the MCP Registry
+  both serve the new version.
+- `server.json` (`io.github.qso-graph/n1mm-mcp`).
+
 ## [0.1.5] — 2026-05-16
 
 ### Added

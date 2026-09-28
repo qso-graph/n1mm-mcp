@@ -1,10 +1,12 @@
+<!-- mcp-name: io.github.qso-graph/n1mm-mcp -->
 # n1mm-mcp
 
-<!-- mcp-name: n1mm-mcp -->
+[![PyPI](https://img.shields.io/pypi/v/n1mm-mcp?label=PyPI&color=blue)](https://pypi.org/project/n1mm-mcp/)
+[![MCP Registry](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fregistry.modelcontextprotocol.io%2Fv0%2Fservers%3Fsearch%3Dn1mm-mcp&query=%24.servers%5B0%5D.server.version&label=MCP%20Registry&color=blue)](https://registry.modelcontextprotocol.io/v0/servers?search=n1mm-mcp)
 
-MCP server for [N1MM Logger+](https://n1mm.hamdocs.com/) — live contest state via UDP broadcast.
+MCP server for [N1MM Logger+](https://n1mm.hamdocs.com/): live contest state — station, QSOs, bandmap, score and rate, multipliers, and contest clock — through any MCP-compatible AI assistant.
 
-Part of the [qso-graph](https://qso-graph.io) amateur radio MCP ecosystem.
+Data from N1MM Logger+'s UDP broadcasts on your local network. Part of the [qso-graph](https://qso-graph.io/) project. **No authentication required.**
 
 ## Install
 
@@ -12,26 +14,52 @@ Part of the [qso-graph](https://qso-graph.io) amateur radio MCP ecosystem.
 pip install n1mm-mcp
 ```
 
-## Tools (Phase 1 — 8 Composite State Views)
+## Tools
 
-| Tool | Description |
-|------|-------------|
-| `n1mm_current_state` | Station snapshot — connection, contest, operator, radios |
-| `n1mm_lookup` | Pre-log callsign (Contest-Copilot trigger) + current band/mode |
-| `n1mm_contacts` | QSO log — recent contacts, edits, deletes |
-| `n1mm_bandmap` | Live spots, mult targets, band activity |
-| `n1mm_performance` | Score, rate, bands, run/S&P, hourly timeline |
-| `n1mm_multipliers` | Mult grid, needs, value analysis |
-| `n1mm_clock` | Contest timing, off-time, pacing |
-| `n1mm_diagnostics` | Server health, parse errors, memory |
-| `get_version_info` | Service version + upstream UDP contract version (fleet identity attestation) |
+| Tool | Description | Key Parameters |
+|------|-------------|----------------|
+| `n1mm_current_state` | Station snapshot: connection, contest, operator, radios | station_name |
+| `n1mm_lookup` | The callsign being entered (pre-log) plus current band and mode | station_name |
+| `n1mm_contacts` | QSO log: recent contacts, edits and deletes | count, since, band, mode, call_pattern |
+| `n1mm_bandmap` | Live spots, multiplier targets, band activity | band, mode, callsign, mults_only |
+| `n1mm_performance` | Score, rate, bands, run/S&P, hourly timeline | band, mode |
+| `n1mm_multipliers` | Multiplier grid, needs, value analysis | band |
+| `n1mm_clock` | Contest timing, off-time, pacing | duration_hours, target_score, target_qsos, min_gap_minutes |
+| `n1mm_diagnostics` | Server health, parse errors, memory | station_name |
+| `get_version_info` | Service version + upstream spec version (fleet identity attestation) | — |
+
+Every tool takes an optional `station_name` for multi-station setups (SO2R, multi-op).
+
+## What is N1MM Logger+?
+
+N1MM Logger+ is a Windows contest logger. It can broadcast its state over UDP: contacts, spots, radio info and score. n1mm-mcp listens to those broadcasts and keeps the contest state in memory, so an assistant can answer questions about it. N1MM doesn't know it's there.
+
+```
+N1MM Logger+ (Windows)
+    │ UDP broadcast (port 12060, XML)
+    ▼
+n1mm-mcp (Python, any OS on the same LAN)
+    ├── UDP listener (background)
+    ├── State engine (in memory, per StationName)
+    │   MCP protocol (stdio)
+    ▼
+AI assistant
+```
 
 ## Quick Start
 
-1. In N1MM: **Config → Configure Ports → Broadcast Data** — enable all message types
-2. N1MM broadcasts to `255.255.255.255:12060` by default
+### Turn on N1MM's broadcasts
 
-### Claude Desktop
+1. In N1MM: **Config → Configure Ports → Broadcast Data**, and enable all message types.
+2. N1MM broadcasts to `255.255.255.255:12060` by default.
+
+### Configure your MCP client
+
+n1mm-mcp works with any MCP-compatible client. Add the server config and restart. The tools appear automatically.
+
+#### Claude Desktop
+
+Add to `claude_desktop_config.json` (`~/Library/Application Support/Claude/` on macOS, `%APPDATA%\Claude\` on Windows):
 
 ```json
 {
@@ -43,64 +71,111 @@ pip install n1mm-mcp
 }
 ```
 
-Or with `uvx` (no install needed):
+#### Claude Code
+
+Add to `.claude/settings.json`:
 
 ```json
 {
   "mcpServers": {
     "n1mm": {
-      "command": "uvx",
-      "args": ["n1mm-mcp"]
+      "command": "n1mm-mcp"
     }
   }
 }
 ```
 
-### Claude Code
+#### ChatGPT Desktop
 
-```bash
-claude mcp add n1mm-mcp -- n1mm-mcp
+```json
+{
+  "mcpServers": {
+    "n1mm": {
+      "command": "n1mm-mcp"
+    }
+  }
+}
 ```
 
-## Architecture
+#### Cursor
 
-```
-N1MM Logger+ (Windows)
-    │ UDP broadcast (port 12060, XML)
-    ▼
-n1mm-mcp (Python, any OS on same LAN)
-    ├── UDP Listener Thread (background)
-    ├── State Engine (in-memory, partitioned by StationName)
-    │   MCP protocol (stdio)
-    ▼
-AI Assistant (Claude, qsp-mcp, etc.)
+Add to `.cursor/mcp.json` (project-level) or `~/.cursor/mcp.json` (global):
+
+```json
+{
+  "mcpServers": {
+    "n1mm": {
+      "command": "n1mm-mcp"
+    }
+  }
+}
 ```
 
-- **Passive listener** — N1MM doesn't know we exist
-- **Stream-to-state** — UDP packets → in-memory state → tool queries
-- **Multi-station** — state partitioned by StationName (SO2R, multi-op)
-- **Zero auth** — no credentials needed
+#### VS Code / GitHub Copilot
+
+Add to `.vscode/mcp.json` in your workspace:
+
+```json
+{
+  "servers": {
+    "n1mm": {
+      "command": "n1mm-mcp"
+    }
+  }
+}
+```
+
+#### Gemini CLI
+
+Add to `~/.gemini/settings.json` (global) or `.gemini/settings.json` (project):
+
+```json
+{
+  "mcpServers": {
+    "n1mm": {
+      "command": "n1mm-mcp"
+    }
+  }
+}
+```
+
+### Ask questions
+
+> "What's my rate over the last hour?"
+
+> "Which multipliers do I still need on 20m?"
+
+> "Is the station on the bandmap a new multiplier?"
+
+> "How much off-time have I used, and am I on pace for my target?"
+
+> "Show me the last 10 QSOs."
 
 ## CLI Options
 
 | Option | Default | Description |
 |--------|---------|-------------|
 | `--port` | `12060` | UDP listen port |
+| `--bind` | `0.0.0.0` | Bind address |
 | `--transport` | `stdio` | MCP transport (`stdio` or `streamable-http`) |
-| `--heartbeat-timeout` | `60` | Seconds before connection goes stale |
-| `--stale-timeout` | `900` | Seconds before connection goes disconnected |
-| `--max-spots` | `2000` | Maximum spots in bandmap buffer |
+| `--heartbeat-timeout` | `60` | Seconds before the connection goes stale |
+| `--stale-timeout` | `900` | Seconds before the connection goes disconnected |
+| `--max-spots` | `2000` | Maximum spots in the bandmap buffer |
 | `--spot-ttl` | `30` | Spot time-to-live in **minutes** |
 
-## Testing
+## Testing Without N1MM
 
 ```bash
-# Mock mode (no N1MM needed)
 N1MM_MCP_MOCK=1 n1mm-mcp
+```
 
-# MCP Inspector
+## MCP Inspector
+
+```bash
 n1mm-mcp --transport streamable-http
 ```
+
+Then open the MCP Inspector at `http://localhost:8008`.
 
 ## Development
 
@@ -108,7 +183,6 @@ n1mm-mcp --transport streamable-http
 git clone https://github.com/qso-graph/n1mm-mcp.git
 cd n1mm-mcp
 pip install -e .
-N1MM_MCP_MOCK=1 n1mm-mcp
 ```
 
 ## License
