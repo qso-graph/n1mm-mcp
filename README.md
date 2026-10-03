@@ -12,7 +12,6 @@ Data from N1MM Logger+'s UDP broadcasts on your local network. Part of the [qso-
 
 ```bash
 uvx n1mm-mcp            # run it; nothing to install
-pip install n1mm-mcp    # or install it into your own environment
 ```
 
 ## Tools
@@ -145,8 +144,6 @@ Add to `~/.gemini/settings.json` (global) or `.gemini/settings.json` (project):
   }
 }
 ```
-
-Installed with pip instead? Use `"command": "n1mm-mcp"` in any config above.
 
 ### Ask questions
 
