@@ -38,7 +38,7 @@ N1MM Logger+ is a Windows contest logger. It can broadcast its state over UDP: c
 N1MM Logger+ (Windows)
     │ UDP broadcast (port 12060, XML)
     ▼
-n1mm-mcp (Python, any OS on the same LAN)
+n1mm-mcp (Python: the same PC, or any OS on the LAN)
     ├── UDP listener (background)
     ├── State engine (in memory, per StationName)
     │   MCP protocol (stdio)
@@ -51,7 +51,19 @@ AI assistant
 ### Turn on N1MM's broadcasts
 
 1. In N1MM: **Config → Configure Ports → Broadcast Data**, and enable all message types.
-2. N1MM broadcasts to `255.255.255.255:12060` by default.
+2. Set the destination to `127.0.0.1:12060`, N1MM's address for "this PC". n1mm-mcp listens there
+   by default, and nothing outside the PC can reach it.
+
+#### N1MM on another PC
+
+Run n1mm-mcp with `--bind 0.0.0.0` (every network interface) or `--bind <this PC's LAN address>`,
+and point N1MM at it: this PC's address (`192.168.1.20:12060`), or your subnet's broadcast address
+(`192.168.1.255:12060`) to reach every PC on it. N1MM accepts several destinations separated by
+spaces. Don't use `255.255.255.255`: N1MM's own documentation warns that it risks broadcasting to
+the internet ([N1MM: External UDP Broadcasts](https://n1mmwp.hamdocs.com/appendices/external-udp-broadcasts/)).
+
+Listening on the network means any device on it can send n1mm-mcp packets, so only do it on a
+network you trust.
 
 ### Configure your MCP client
 
@@ -162,7 +174,7 @@ Add to `~/.gemini/settings.json` (global) or `.gemini/settings.json` (project):
 | Option | Default | Description |
 |--------|---------|-------------|
 | `--port` | `12060` | UDP listen port |
-| `--bind` | `0.0.0.0` | Bind address |
+| `--bind` | `127.0.0.1` | Address to listen on; `0.0.0.0` for N1MM on another PC |
 | `--transport` | `stdio` | MCP transport (`stdio` or `streamable-http`) |
 | `--heartbeat-timeout` | `60` | Seconds before the connection goes stale |
 | `--stale-timeout` | `900` | Seconds before the connection goes disconnected |

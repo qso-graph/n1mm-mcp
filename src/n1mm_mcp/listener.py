@@ -15,6 +15,9 @@ import os
 import socket
 import threading
 import xml.etree.ElementTree as ET
+
+import defusedxml.ElementTree as SafeET
+from defusedxml import DefusedXmlException
 from datetime import datetime, timezone
 from typing import Any
 
@@ -251,7 +254,7 @@ class UDPListener:
         self,
         state: StateEngine,
         port: int = 12060,
-        bind_addr: str = "0.0.0.0",
+        bind_addr: str = "127.0.0.1",
     ) -> None:
         self.state = state
         self.port = port
@@ -303,9 +306,10 @@ class UDPListener:
         except Exception:
             return
 
+        # Packets come from the network: parse without entity expansion or DTDs.
         try:
-            root = ET.fromstring(text)
-        except ET.ParseError:
+            root = SafeET.fromstring(text)
+        except (ET.ParseError, DefusedXmlException):
             # Determine message type from raw text for error counter
             self._count_parse_error(text, raw)
             return

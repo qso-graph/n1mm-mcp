@@ -5,6 +5,20 @@ All notable changes to `n1mm-mcp` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.7] — 2026-10-04
+
+### Security
+- **Listens on `127.0.0.1` by default** (was `0.0.0.0`, every network interface). Any device on the
+  network could send it packets and feed false contest state to the assistant. For N1MM on another
+  PC, run with `--bind 0.0.0.0` (or that interface's address). Found by CodeQL
+  `py/bind-socket-all-network-interfaces`.
+- **Incoming XML is parsed with `defusedxml`**, which refuses entity expansion and DTDs.
+
+### Changed — action needed if N1MM runs on another PC
+- The README's N1MM setup follows [N1MM's documentation](https://n1mmwp.hamdocs.com/appendices/external-udp-broadcasts/):
+  `127.0.0.1:12060` for the same PC; that PC's address or the subnet broadcast (`x.x.x.255`) for
+  another. It no longer says N1MM sends to `255.255.255.255`, which N1MM advises against.
+
 ## [0.1.6] — 2026-09-28
 
 ### Changed
