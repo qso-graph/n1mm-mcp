@@ -1,6 +1,6 @@
 [project]
 name = "n1mm-mcp"
-version = "0.1.6"
+version = "0.1.7"
 description = "MCP server for N1MM Logger+ — live contest state via UDP broadcast"
 readme = "README.md"
 license = {text = "GPL-3.0-or-later"}
@@ -8,6 +8,7 @@ authors = [{name = "Greg Beam, KI7MT", email = "ki7mt@yahoo.com"}]
 requires-python = ">=3.10"
 dependencies = [
     "fastmcp>=3.0",
+    "defusedxml>=0.7.1",
 ]
 keywords = [
     "amateur-radio", "ham-radio", "mcp", "model-context-protocol",

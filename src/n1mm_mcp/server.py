@@ -915,7 +915,11 @@ def main() -> None:
         description="MCP server for N1MM Logger+ contest state via UDP broadcast",
     )
     parser.add_argument("-p", "--port", type=int, default=12060, help="UDP listen port")
-    parser.add_argument("-b", "--bind", default="0.0.0.0", help="Bind address")
+    parser.add_argument(
+        "-b", "--bind", default="127.0.0.1",
+        help="Address to listen on (default 127.0.0.1: N1MM on this PC). "
+             "0.0.0.0 listens on every network interface, for N1MM on another PC.",
+    )
     parser.add_argument(
         "--heartbeat-timeout",
         type=int,
