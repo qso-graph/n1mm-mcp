@@ -3,6 +3,7 @@
 Phase 1 tools (8 of 12 composite State Views):
   n1mm_current_state, n1mm_lookup, n1mm_contacts, n1mm_bandmap,
   n1mm_performance, n1mm_multipliers, n1mm_clock, n1mm_diagnostics
+Phase 2 (#9): n1mm_so2r, n1mm_network, n1mm_pileup
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ from typing import Any
 from fastmcp import FastMCP
 
 from . import __spec_version__, __version__
+from . import analysis
 from .frequency import freq_to_band, from_spot_freq, from_tens_hz
 from .state import (
     DEFAULT_HEARTBEAT_TIMEOUT,
@@ -874,6 +876,94 @@ def n1mm_clock(
     result["pace"] = pace
 
     return result
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 (#9): SO2R, networked stations, DXpedition pileups
+# ---------------------------------------------------------------------------
+@mcp.tool()
+def n1mm_so2r(station_name: str | None = None) -> dict[str, Any]:
+    """Two-radio (SO2R) view: both radios now, and how they've been used.
+
+    Returns each radio's band, frequency, mode and run/transmit state, N1MM's transmit
+    focus and receive focus, whether both radios are on the same band, each radio's
+    share of N1MM-keyed transmit time (a paddle or PTT isn't reported by N1MM) and
+    minutes per band, transmit- and receive-focus swaps, QSOs per radio, and QSOs made
+    on one radio while the other was running. Timing covers the RadioInfo packets seen
+    since the MCP server started (or the contest changed). Read from N1MM's
+    broadcasts; no rig is read.
+    """
+    state = _get_state()
+    station = state.resolve_station(station_name)
+    if station is None:
+        names = state.get_station_names()
+        if not names:
+            return _disconnected_error()
+        return _station_error(names)
+    return analysis.so2r(station.snapshot(), datetime.now(timezone.utc))
+
+
+@mcp.tool()
+def n1mm_network() -> dict[str, Any]:
+    """Every networked N1MM station at once (multi-op).
+
+    Per station: operator, radios (band, mode, running, transmitting), QSOs, rate over
+    10 and 60 minutes, mults in the last hour, minutes since the last QSO, the band of
+    its recent QSOs with minutes on it and band changes in the last hour, and when it
+    was last heard. Also: which stations are on each band, stations sharing a band
+    and mode, each station's contest score (shared per contest call), and QSOs per
+    operator this hour against the hour before.
+    """
+    state = _get_state()
+    names = sorted(state.get_station_names())
+    if not names:
+        return _disconnected_error()
+    stations = [state.resolve_station(n) for n in names]
+    now = datetime.now(timezone.utc)
+    result = analysis.network([st.snapshot() for st in stations if st], now)
+    scores: dict[str, Any] = {}
+    for st in stations:
+        if st is None:
+            continue
+        view = _score_view(state, st)
+        if view and view["call"] not in scores:
+            s = view["score"]
+            scores[view["call"]] = {
+                "contest": s.contest,
+                "score": s.score,
+                "qsos": s.total_qsos(),
+                "stations": view["stations"],
+                "observed_qsos": view["observed_qsos"],
+            }
+    result["scores_by_call"] = scores
+    result["connection"] = state.connection_status()
+    return result
+
+
+@mcp.tool()
+def n1mm_pileup(window_minutes: int = 60, station_name: str | None = None) -> dict[str, Any]:
+    """DXpedition pileup view: rate, who's calling, dupes, split, dead air.
+
+    Over the last window_minutes (default 60, 5 to 1440): QSOs, unique calls, dupes
+    (a call already worked on that band and mode), run share, rate over 5, 15 and 60
+    minutes and the best 10 minutes in the window, QSOs and share by continent, the
+    top 10 country prefixes, QSOs by band and mode, gaps of 2 minutes or more between
+    QSOs, and the active radio's split (RX, TX, kHz up).
+
+    Args:
+        window_minutes: How far back to look, in minutes.
+        station_name: Station to query.
+    """
+    if not isinstance(window_minutes, int) or not 5 <= window_minutes <= 1440:
+        return {"error": "invalid_window", "message": "window_minutes must be 5 to 1440."}
+    state = _get_state()
+    station = state.resolve_station(station_name)
+    if station is None:
+        names = state.get_station_names()
+        if not names:
+            return _disconnected_error()
+        return _station_error(names)
+    return analysis.pileup(station.snapshot(), datetime.now(timezone.utc), window_minutes)
 
 
 # ---------------------------------------------------------------------------

@@ -26,9 +26,14 @@ uvx n1mm-mcp            # run it; nothing to install
 | `n1mm_multipliers` | Multiplier grid, needs, value analysis | band |
 | `n1mm_clock` | Contest timing, off-time, pacing | duration_hours, target_score, target_qsos, min_gap_minutes |
 | `n1mm_diagnostics` | Server health, parse errors, memory | station_name |
+| `n1mm_so2r` | Two radios: each radio now, transmit/receive focus, same-band warning, transmit time and minutes per band, focus swaps, QSOs per radio and while the other radio runs | station_name |
+| `n1mm_network` | Every networked station: operator, radios, rate, idle time, band, shared score per contest call, stations sharing a band and mode, QSOs per operator | — |
+| `n1mm_pileup` | DXpedition pileup: rate, unique calls, dupes, continents and countries calling, split, dead air | window_minutes |
 | `get_version_info` | Service version + upstream spec version (fleet identity attestation) | — |
 
-Every tool takes an optional `station_name` for multi-station setups (SO2R, multi-op).
+Every tool except `n1mm_network` (which covers all stations) takes an optional `station_name` for multi-station setups.
+
+Everything comes from N1MM's UDP broadcasts; n1mm-mcp never talks to a radio. N1MM reports transmitting only when it keys the radio itself (macros, its CW keyer), so a paddle or microphone PTT doesn't count as transmit time in `n1mm_so2r`.
 
 ## What is N1MM Logger+?
 
