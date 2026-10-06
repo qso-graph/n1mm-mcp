@@ -55,6 +55,26 @@ def _station_error(names: list[str]) -> dict[str, Any]:
     }
 
 
+def _score_view(state: Any, station: Any) -> dict[str, Any] | None:
+    """The station's contest score, from the contest call it uses (#12)."""
+    return state.score_view(station)
+
+
+def _shared_label(view: dict[str, Any]) -> dict[str, Any] | None:
+    """When several stations share the contest call, say the score covers all of them."""
+    if len(view["stations"]) < 2:
+        return None
+    return {
+        "call": view["call"],
+        "stations": view["stations"],
+        "note": (
+            "N1MM sends one score per contest call. This is the score for %s, "
+            "covering all %d stations on that call, not this station alone."
+            % (view["call"], len(view["stations"]))
+        ),
+    }
+
+
 def _disconnected_error() -> dict[str, Any]:
     return {"status": "disconnected", "message": "No N1MM data received yet."}
 
@@ -347,20 +367,23 @@ def n1mm_contacts(
 
     # Cross-reference Score XML — surface discrepancy if QSOs were logged
     # before the MCP server started (UDP-only limitation)
-    with station.score_lock:
-        if station.score_state:
-            score_qsos = sum(station.score_state.band_mode_qsos.values())
-            if score_qsos > total:
-                result["score_discrepancy"] = {
-                    "score_xml_qsos": score_qsos,
-                    "observed_qsos": total,
-                    "missed": score_qsos - total,
-                    "reason": (
-                        "QSOs were logged before the MCP server started. "
-                        "Score XML reports cumulative totals but individual "
-                        "contact details are only available for QSOs observed live."
-                    ),
-                }
+    view = _score_view(state, station)
+    if view:
+        score_qsos = view["score"].total_qsos()
+        observed = view["observed_qsos"]
+        if score_qsos > observed:
+            result["score_discrepancy"] = {
+                "score_xml_qsos": score_qsos,
+                "observed_qsos": observed,
+                "missed": score_qsos - observed,
+                "reason": (
+                    "QSOs were logged before the MCP server started. "
+                    "Score XML reports cumulative totals but individual "
+                    "contact details are only available for QSOs observed live."
+                ),
+            }
+            if shared := _shared_label(view):
+                result["score_discrepancy"]["shared_score"] = shared
 
     return result
 
@@ -482,16 +505,18 @@ def n1mm_performance(
 
     # Score
     score_data: dict[str, Any] = {"total_qsos": 0, "total_score": 0}
-    with station.score_lock:
-        if station.score_state:
-            s = station.score_state
-            score_data = {
-                "total_qsos": sum(s.band_mode_qsos.values()),
-                "total_score": s.score,
-                "band_mode_qsos": {
-                    f"{b}_{m}": c for (b, m), c in s.band_mode_qsos.items()
-                },
-            }
+    view = _score_view(state, station)
+    if view:
+        s = view["score"]
+        score_data = {
+            "total_qsos": s.total_qsos(),
+            "total_score": s.score,
+            "band_mode_qsos": {
+                f"{b}_{m}": c for (b, m), c in s.band_mode_qsos.items()
+            },
+        }
+        if shared := _shared_label(view):
+            score_data["shared"] = shared
 
     with station.contact_lock:
         log = station.contact_log
@@ -580,13 +605,15 @@ def n1mm_performance(
         "total_qsos": total,
     }
 
-    # Flag discrepancy between Score XML and observed contacts
+    # Flag discrepancy between Score XML and observed contacts (all stations on a
+    # shared call, since the score covers them all)
     score_total = score_data.get("total_qsos", 0)
-    if score_total > total:
+    observed = view["observed_qsos"] if view else total
+    if score_total > observed:
         result["score_discrepancy"] = {
             "score_xml_qsos": score_total,
-            "observed_qsos": total,
-            "missed": score_total - total,
+            "observed_qsos": observed,
+            "missed": score_total - observed,
             "reason": (
                 "Rate, breakdown, and run/S&P stats reflect only QSOs "
                 "observed live. Score totals come from N1MM's cumulative XML."
@@ -695,22 +722,23 @@ def n1mm_multipliers(
         result["filter_band"] = band
 
     # Cross-reference Score XML for discrepancy
-    with station.score_lock:
-        if station.score_state:
-            score_qsos = sum(station.score_state.band_mode_qsos.values())
-            with station.contact_lock:
-                observed = len(station.contact_log)
-            if score_qsos > observed:
-                result["score_discrepancy"] = {
-                    "score_xml_qsos": score_qsos,
-                    "observed_qsos": observed,
-                    "missed": score_qsos - observed,
-                    "reason": (
-                        "Multiplier data is only available for QSOs observed "
-                        "live. Score XML reports %d QSOs but only %d were "
-                        "seen by the MCP server." % (score_qsos, observed)
-                    ),
-                }
+    view = _score_view(state, station)
+    if view:
+        score_qsos = view["score"].total_qsos()
+        observed = view["observed_qsos"]
+        if score_qsos > observed:
+            result["score_discrepancy"] = {
+                "score_xml_qsos": score_qsos,
+                "observed_qsos": observed,
+                "missed": score_qsos - observed,
+                "reason": (
+                    "Multiplier data is only available for QSOs observed "
+                    "live. Score XML reports %d QSOs but only %d were "
+                    "seen by the MCP server." % (score_qsos, observed)
+                ),
+            }
+            if shared := _shared_label(view):
+                result["score_discrepancy"]["shared_score"] = shared
 
     return result
 
@@ -744,6 +772,7 @@ def n1mm_clock(
         return _station_error(names)
 
     now = datetime.now(timezone.utc)
+    view = _score_view(state, station)  # before contact_lock: it takes station locks
 
     with station.contact_lock:
         log = station.contact_log
@@ -751,20 +780,19 @@ def n1mm_clock(
 
         if not log:
             # Check Score XML before claiming "no contacts"
-            with station.score_lock:
-                if station.score_state:
-                    score_qsos = sum(station.score_state.band_mode_qsos.values())
-                    if score_qsos > 0:
-                        return {
-                            "status": "no_observed_contacts",
-                            "message": (
-                                "No contacts observed live, but Score XML "
-                                "reports %d QSOs logged before the MCP server "
-                                "started. Timing and pacing data require live "
-                                "contact observation." % score_qsos
-                            ),
-                            "score_xml_qsos": score_qsos,
-                        }
+            if view:
+                score_qsos = view["score"].total_qsos()
+                if score_qsos > view["observed_qsos"]:
+                    return {
+                        "status": "no_observed_contacts",
+                        "message": (
+                            "No contacts observed live, but Score XML "
+                            "reports %d QSOs logged before the MCP server "
+                            "started. Timing and pacing data require live "
+                            "contact observation." % score_qsos
+                        ),
+                        "score_xml_qsos": score_qsos,
+                    }
             return {"status": "no_contacts", "message": "No contacts logged yet."}
 
         first_ts = log[0].timestamp
@@ -802,10 +830,7 @@ def n1mm_clock(
         total_off_min = sum(p["duration_minutes"] for p in off_periods)
 
     # Score for pacing
-    current_score = 0
-    with station.score_lock:
-        if station.score_state:
-            current_score = station.score_state.score
+    current_score = view["score"].score if view else 0
 
     result: dict[str, Any] = {
         "clock": {
