@@ -7,6 +7,8 @@ LOCK ACQUISITION ORDER (Patton P1 — HARD RULE):
     radio_lock → contact_lock → score_lock → spot_lock → lookup_lock
 
 Any code path that needs multiple locks MUST acquire them in this order.
+StateEngine's _scores_lock and _stations_lock are never held while a station lock is
+taken: score_view() copies what it needs under each lock in turn.
 This prevents deadlock between the UDP listener thread (writes) and
 concurrent MCP tool handlers (reads). Violation = deadlock risk.
 """
@@ -98,7 +100,6 @@ class StationState:
         self.spot_map: dict[tuple[str, str], Spot] = {}  # (dxcall, band) → Spot
         self.spot_buffer: deque[Spot] = deque(maxlen=max_spots)
 
-        self.score_state: ScoreState | None = None
         self.lookup_state: LookupState | None = None
 
     def update_radio(self, radio: RadioState) -> None:
@@ -152,9 +153,22 @@ class StationState:
             for k in stale:
                 del self.spot_map[k]
 
-    def update_score(self, score: ScoreState) -> None:
-        with self.score_lock:
-            self.score_state = score
+    def calls(self) -> set[str]:
+        """The contest callsigns this station uses: from AppInfo, RadioInfo and contacts."""
+        with self.radio_lock:
+            found = {self.station_info.mycall} | {r.mycall for r in self.radio_state.values()}
+        with self.contact_lock:
+            if self.contact_log:
+                found.add(self.contact_log[-1].mycall)
+        return {c.strip().upper() for c in found if c and c.strip()}
+
+    def contest_name(self) -> str:
+        with self.radio_lock:
+            return self.station_info.contest_name
+
+    def observed_qsos(self) -> int:
+        with self.contact_lock:
+            return len(self.contact_log)
 
     def update_lookup(self, lookup: LookupState) -> None:
         with self.lookup_lock:
@@ -163,15 +177,14 @@ class StationState:
     def reset_contest_state(self) -> None:
         """Reset state on contest name change (Patton P0).
 
-        Clears contacts, score, spots, mults — preserves station_info.
+        Clears contacts, spots, mults — preserves station_info. The score is held per
+        contest call (StateEngine) and is only shown for the contest it reports.
         """
         with self.contact_lock:
             self.contact_log.clear()
             self.contact_index.clear()
             self.edit_log.clear()
             self.delete_log.clear()
-        with self.score_lock:
-            self.score_state = None
         with self.spot_lock:
             self.spot_map.clear()
             self.spot_buffer.clear()
@@ -205,6 +218,12 @@ class StateEngine:
         # RadioInfo carries mycall + StationName; dynamicresults only has call.
         # This map lets us route Score packets to the correct station.
         self._call_to_station: dict[str, str] = {}
+
+        # Scores, by contest call (#12). DynamicResults has no StationName: at a multi-op
+        # station every PC shares one call, so the score belongs to the call, and each
+        # station on that call shows it, labelled as shared.
+        self._scores_lock = threading.Lock()
+        self._scores: dict[str, ScoreState] = {}
 
         self.parse_errors = ParseErrors()
         self.packets_received: int = 0
@@ -304,22 +323,61 @@ class StateEngine:
         if self.packets_received % 100 == 0:
             station.evict_stale_spots()
 
-    def handle_score(self, station_name: str, score: ScoreState) -> None:
-        # dynamicresults lacks <StationName> — listener passes call as station_name.
-        # Map to real station via _call_to_station (populated by RadioInfo).
-        resolved = self._call_to_station.get(station_name, station_name)
-        station = self._get_or_create_station(resolved)
-        station.update_score(score)
+    def handle_score(self, call: str, score: ScoreState) -> None:
+        """Store a score under its contest call (#12).
+
+        If no station is known to use the call yet (no AppInfo, RadioInfo or contact
+        from it), a station named after the call holds it, so a lone score is still seen."""
+        call = (call or "").strip().upper()
+        if not call:
+            return
+        with self._scores_lock:
+            self._scores[call] = score
+        with self._stations_lock:
+            stations = list(self._stations.values())
+        users = [st for st in stations if call in st.calls()]
+        if not users:
+            st = self._get_or_create_station(call)
+            with st.radio_lock:
+                if not st.station_info.mycall:
+                    st.station_info.mycall = call
+            users = [st]
         # Backfill contest_name from Score if AppInfo never arrived
         if score.contest:
-            with station.radio_lock:
-                if not station.station_info.contest_name:
-                    station.station_info.contest_name = score.contest
-                    logger.info(
-                        "Contest name backfilled from Score: %s (station %s)",
-                        score.contest,
-                        resolved,
-                    )
+            for st in users:
+                with st.radio_lock:
+                    if not st.station_info.contest_name:
+                        st.station_info.contest_name = score.contest
+                        logger.info(
+                            "Contest name backfilled from Score: %s (station %s)",
+                            score.contest,
+                            st.station_name,
+                        )
+
+    def score_view(self, station: StationState) -> dict[str, Any] | None:
+        """The score for a station's contest call, or None (#12).
+
+        Returns score, call, stations (every station on that call) and observed_qsos
+        (contacts seen from all of them). A score for a different contest than the
+        station's is not returned."""
+        calls = station.calls()
+        with self._scores_lock:
+            found = [(c, self._scores[c]) for c in sorted(calls) if c in self._scores]
+        if not found:
+            return None
+        call, score = max(found, key=lambda f: f[1].received_at)
+        contest = station.contest_name()
+        if contest and score.contest and contest != score.contest:
+            return None
+        with self._stations_lock:
+            stations = list(self._stations.values())
+        sharing = [st for st in stations if call in st.calls()]
+        return {
+            "score": score,
+            "call": call,
+            "stations": sorted(st.station_name for st in sharing),
+            "observed_qsos": sum(st.observed_qsos() for st in sharing),
+        }
 
     def handle_lookup(self, station_name: str, lookup: LookupState) -> None:
         station = self._get_or_create_station(station_name)

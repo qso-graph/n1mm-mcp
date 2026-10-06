@@ -6,12 +6,12 @@
     "url": "https://github.com/qso-graph/n1mm-mcp",
     "source": "github"
   },
-  "version": "0.1.6",
+  "version": "0.1.8",
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "n1mm-mcp",
-      "version": "0.1.6",
+      "version": "0.1.8",
       "transport": { "type": "stdio" }
     }
   ],
