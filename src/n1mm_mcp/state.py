@@ -40,6 +40,7 @@ DEFAULT_HEARTBEAT_TIMEOUT = 60  # seconds → stale
 DEFAULT_STALE_TIMEOUT = 900  # seconds → disconnected (15 min)
 DEFAULT_SPOT_TTL = 1800  # seconds (30 min)
 DEFAULT_MAX_SPOTS = 2000
+DEFAULT_MAX_RADIO_EVENTS = 50000  # RadioInfo history for SO2R timing (#9)
 
 
 @dataclass
@@ -90,6 +91,8 @@ class StationState:
 
         # State objects
         self.radio_state: dict[int, RadioState] = {}  # keyed by RadioNr (1, 2)
+        # Every RadioInfo, oldest first, for SO2R timing (#9). Bounded.
+        self.radio_events: deque[RadioState] = deque(maxlen=DEFAULT_MAX_RADIO_EVENTS)
         self.station_info: StationInfo = StationInfo(station_name=station_name)
 
         self.contact_log: list[Contact] = []
@@ -105,6 +108,26 @@ class StationState:
     def update_radio(self, radio: RadioState) -> None:
         with self.radio_lock:
             self.radio_state[radio.radio_nr] = radio
+            self.radio_events.append(radio)
+
+    def snapshot(self) -> dict[str, Any]:
+        """Copies of the radio and contact state, for analysis outside the locks (#9).
+
+        Deleted contacts are left out of contacts."""
+        with self.radio_lock:
+            radios = dict(self.radio_state)
+            events = list(self.radio_events)
+            info = self.station_info
+        with self.contact_lock:
+            deleted = {d["guid"] for d in self.delete_log if d.get("guid")}
+            contacts = [c for c in self.contact_log if not (c.guid and c.guid in deleted)]
+        return {
+            "station_name": self.station_name,
+            "info": info,
+            "radios": radios,
+            "radio_events": events,
+            "contacts": contacts,
+        }
 
     def update_station_info(self, info: StationInfo) -> None:
         with self.radio_lock:
@@ -177,9 +200,11 @@ class StationState:
     def reset_contest_state(self) -> None:
         """Reset state on contest name change (Patton P0).
 
-        Clears contacts, spots, mults — preserves station_info. The score is held per
+        Clears contacts, spots, mults and the radio history — preserves station_info. The score is held per
         contest call (StateEngine) and is only shown for the contest it reports.
         """
+        with self.radio_lock:
+            self.radio_events.clear()
         with self.contact_lock:
             self.contact_log.clear()
             self.contact_index.clear()

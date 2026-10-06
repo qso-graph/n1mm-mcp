@@ -5,6 +5,21 @@ All notable changes to `n1mm-mcp` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- **Three new tools for two radios, networked stations and DXpeditions** (#9).
+  - `n1mm_so2r`: both radios now, N1MM's transmit and receive focus, a same-band flag, each
+    radio's share of N1MM-keyed transmit time and minutes per band, focus swaps, QSOs per radio,
+    and QSOs on one radio while the other was running.
+  - `n1mm_network`: every networked station at once, with operator, radios, rate, minutes since
+    the last QSO, minutes on the current band and band changes in the last hour, the contest score
+    per call, stations sharing a band and mode, and QSOs per operator this hour against the last.
+  - `n1mm_pileup`: over a chosen window, rate (5, 15, 60 minutes and the best 10), unique calls,
+    dupes, QSOs by continent and top countries, band and mode, the split offset, and gaps of two
+    minutes or more.
+  Read from N1MM's broadcasts only; no rig is read. RadioInfo history is kept (bounded) for the
+  SO2R timing and cleared when the contest changes. Deleted QSOs are left out.
+
 ## [0.1.8] — 2026-10-06
 
 - **The score's QSO count no longer counts N1MM's total row twice** (#11). N1MM's score packet lists
