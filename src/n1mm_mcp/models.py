@@ -166,6 +166,17 @@ class ScoreState:
     station_name: str = ""
     received_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
+    def total_qsos(self) -> int:
+        """QSOs in the score: N1MM's own total row when it sends one (#11).
+
+        The breakdown lists QSOs per band and mode plus a band="total" row. Summing every
+        row counted the QSOs twice. mode="ALL" rows on a band are a category of their own,
+        so only band="total" is the total; without it, the rows are summed."""
+        totals = [c for (b, _m), c in self.band_mode_qsos.items() if b.lower() == "total"]
+        if totals:
+            return max(totals)
+        return sum(self.band_mode_qsos.values())
+
 
 @dataclass
 class LookupState:
