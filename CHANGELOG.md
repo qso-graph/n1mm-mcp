@@ -5,6 +5,18 @@ All notable changes to `n1mm-mcp` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- **`n1mm_so2r` says what span its timing covers** (#21). `timing` now carries `from_utc`, the
+  timestamp of the oldest RadioInfo packet still held, and `truncated` with a sentence explaining
+  it. N1MM sends a RadioInfo packet per radio every ten seconds plus one on every change, so two
+  radios fill the 50,000-packet history in roughly 40 to 70 hours and the oldest then drop off.
+  Transmit share, minutes per band and focus swaps were computed over whatever was left, and
+  nothing in the output said so — a share read at hour 40 of a 48-hour contest looked like the
+  whole contest. `truncated` is reported when the history is full rather than when a drop is
+  observed, because from here those are the same thing, and erring towards "these figures are
+  partial" is the safe direction for a number somebody reads as a total.
+
 ## [0.2.0] — 2026-10-06
 
 - **Three new tools for two radios, networked stations and DXpeditions** (#9).
