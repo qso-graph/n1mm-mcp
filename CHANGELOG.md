@@ -32,6 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   kind rather than two branch-local imports a checker reads as a reassignment.
 - `E501` is deferred rather than adopted (qso-graph-devel#70): what it reports in these repos are
   widths, not defects, and some lines are long because they name a publisher's field exactly.
+- **The published contact is `maintainers@qso-graph.io`** (qso-graph-devel#69). The `authors` field
+  carried a personal address, and that field is what PyPI shows on the package page. The project
+  has had outside contributions; a project address is the fitting route for them.
 
 ## [0.2.0] — 2026-10-06
 
