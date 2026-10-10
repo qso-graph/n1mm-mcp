@@ -17,6 +17,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   observed, because from here those are the same thing, and erring towards "these figures are
   partial" is the safe direction for a number somebody reads as a total.
 
+- **ruff and mypy run in CI** (qso-graph-devel#66), as a job the `ci-all-green` gate requires.
+  Settings follow `adif-mcp`, the reference for every qso-graph Python repo, rather than a style of
+  this repo's own. They run once rather than per Python version: both read the source, and neither
+  answer changes with the interpreter.
+- `n1mm_so2r`'s transmit and per-band times are kept in `defaultdict(float)` rather than `Counter`.
+  They accumulate seconds, and a `Counter` types its values as integers; the `most_common()` call
+  that was the reason for reaching for one is written out as the sort it performs, which orders the
+  same way for ties.
+- `evict_stale_spots` no longer reads the monotonic clock it never used; it compares against a
+  wall-clock cutoff.
+- Nine unused imports removed, `ScoreState.band_mode_qsos` says what it holds, `_score_view` and
+  the spot list name their types, and the listener a run chooses is one name declared to be either
+  kind rather than two branch-local imports a checker reads as a reassignment.
+- `E501` is deferred rather than adopted (qso-graph-devel#70): what it reports in these repos are
+  widths, not defects, and some lines are long because they name a publisher's field exactly.
+
 ## [0.2.0] — 2026-10-06
 
 - **Three new tools for two radios, networked stations and DXpeditions** (#9).
