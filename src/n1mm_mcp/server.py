@@ -9,15 +9,12 @@ Phase 2 (#9): n1mm_so2r, n1mm_network, n1mm_pileup
 from __future__ import annotations
 
 import os
-import sys
-import time
 from datetime import datetime, timezone
 from typing import Any
 
 from fastmcp import FastMCP
 
-from . import __spec_version__, __version__
-from . import analysis
+from . import __spec_version__, __version__, analysis
 from .frequency import freq_to_band, from_spot_freq, from_tens_hz
 from .state import (
     DEFAULT_HEARTBEAT_TIMEOUT,
@@ -59,7 +56,8 @@ def _station_error(names: list[str]) -> dict[str, Any]:
 
 def _score_view(state: Any, station: Any) -> dict[str, Any] | None:
     """The station's contest score, from the contest call it uses (#12)."""
-    return state.score_view(station)
+    view: dict[str, Any] | None = state.score_view(station)
+    return view
 
 
 def _shared_label(view: dict[str, Any]) -> dict[str, Any] | None:
@@ -81,7 +79,7 @@ def _disconnected_error() -> dict[str, Any]:
     return {"status": "disconnected", "message": "No N1MM data received yet."}
 
 
-def _radio_to_dict(radio) -> dict[str, Any]:
+def _radio_to_dict(radio: Any) -> dict[str, Any]:
     freq = from_tens_hz(radio.freq_hz)
     return {
         "radio_nr": radio.radio_nr,
@@ -439,7 +437,7 @@ def n1mm_bandmap(
     if mults_only:
         filtered = [s for s in filtered if "mult" in s.status_list.lower()]
 
-    spot_list = []
+    spot_list: list[dict[str, Any]] = []
     for s in filtered:
         age_s = (now - s.received_at).total_seconds()
         spot_list.append(
@@ -534,7 +532,7 @@ def n1mm_performance(
             filtered = [c for c in filtered if c.mode.upper() == mode.upper()]
 
         # Rate calculation — rolling windows
-        def _count_since(contacts: list, seconds: float) -> int:
+        def _count_since(contacts: list[Any], seconds: float) -> int:
             cutoff = now.timestamp() - seconds
             return sum(1 for c in contacts if c.received_at.timestamp() > cutoff)
 
@@ -1091,13 +1089,12 @@ def main() -> None:
 
     # Start listener
     is_mock = os.environ.get("N1MM_MCP_MOCK", "").strip() in ("1", "true", "yes")
-    if is_mock:
-        from .listener import MockListener
+    from .listener import MockListener, UDPListener
 
+    listener: MockListener | UDPListener
+    if is_mock:
         listener = MockListener(_state)
     else:
-        from .listener import UDPListener
-
         listener = UDPListener(_state, port=args.port, bind_addr=args.bind)
 
     listener.start()
