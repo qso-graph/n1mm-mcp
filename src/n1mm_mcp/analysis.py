@@ -14,6 +14,7 @@ from typing import Any
 
 from .frequency import freq_to_band, from_tens_hz
 from .models import Contact, RadioState
+from .state import DEFAULT_MAX_RADIO_EVENTS
 
 # A gap between two RadioInfo packets longer than this is not counted: N1MM sends
 # RadioInfo every 10 seconds and immediately on any change (N1MM's External UDP
@@ -113,7 +114,22 @@ def so2r(snap: dict[str, Any], now: datetime) -> dict[str, Any]:
         if len(last) >= 2 and len({_band(r) for r in last.values()}) == 1:
             same_band += dt
 
+    # What span the figures below actually cover (#21).
+    #
+    # radio_events is a bounded history: N1MM sends a RadioInfo packet per radio
+    # every ten seconds plus one on every change, so two radios fill 50,000 in
+    # roughly 40 to 70 hours and the oldest then drop off. Everything in this
+    # block is computed from what is left, and without saying so a transmit
+    # share read at hour 40 looks like the whole contest.
+    #
+    # `truncated` is reported when the history is full rather than when a drop
+    # is observed, because a full deque and a deque that has just dropped a
+    # packet are the same thing from here. Erring towards saying the figures are
+    # partial is the safe direction for a number somebody reads as a contest
+    # total.
     result["timing"] = {
+        "from_utc": events[0].received_at.isoformat() if events else None,
+        "truncated": len(events) >= DEFAULT_MAX_RADIO_EVENTS,
         "observed_minutes": round(observed / 60, 1),
         "transmit_pct": {f"radio_{nr}": _pct(tx[nr], observed) for nr in seen},
         "transmit_note": (
@@ -124,6 +140,12 @@ def so2r(snap: dict[str, Any], now: datetime) -> dict[str, Any]:
             f"radio_{nr}": {b: round(t / 60, 1) for b, t in band_time[nr].most_common()}
             for nr in seen
         },
+        "truncated_note": (
+            "The RadioInfo history is full, so these figures start at from_utc and not at the "
+            "start of the contest."
+            if len(events) >= DEFAULT_MAX_RADIO_EVENTS
+            else "The RadioInfo history covers everything received since from_utc."
+        ),
         "same_band_pct": _pct(same_band, observed),
         "transmit_focus_swaps": swaps,
         "receive_focus_swaps": focus_switches,
