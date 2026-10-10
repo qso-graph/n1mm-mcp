@@ -11,17 +11,15 @@ Parse failure policy (Patton P1):
 from __future__ import annotations
 
 import logging
-import os
 import socket
 import threading
 import xml.etree.ElementTree as ET
-
-import defusedxml.ElementTree as SafeET
-from defusedxml import DefusedXmlException
 from datetime import datetime, timezone
 from typing import Any
 
-from .frequency import from_tens_hz
+import defusedxml.ElementTree as SafeET
+from defusedxml import DefusedXmlException
+
 from .models import (
     Contact,
     LookupState,

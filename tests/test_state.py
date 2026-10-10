@@ -1,7 +1,5 @@
 """Functional tests for StateEngine — callsign mapping, contest backfill, discrepancy."""
 
-import os
-
 from n1mm_mcp.models import Contact, RadioState, ScoreState, StationInfo
 from n1mm_mcp.state import StateEngine
 
@@ -164,8 +162,8 @@ class TestScoreDiscrepancy:
 
     def test_tool_contacts_surfaces_discrepancy(self):
         """Integration: n1mm_contacts tool output includes score_discrepancy."""
-        from n1mm_mcp.server import n1mm_contacts
         import n1mm_mcp.server as srv
+        from n1mm_mcp.server import n1mm_contacts
 
         engine = self._setup_station()
         score = ScoreState(

@@ -14,9 +14,8 @@ import pytest
 
 from n1mm_mcp.frequency import freq_to_band, from_spot_freq, from_tens_hz
 from n1mm_mcp.listener import _bool, _int, _text
-from n1mm_mcp.models import Contact, RadioState, ScoreState, StationInfo
+from n1mm_mcp.models import Contact, RadioState, StationInfo
 from n1mm_mcp.state import StateEngine
-
 
 # ---------------------------------------------------------------------------
 # N1MM-L2-001..010: from_tens_hz

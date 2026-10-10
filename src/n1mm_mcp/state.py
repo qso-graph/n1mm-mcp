@@ -17,13 +17,12 @@ from __future__ import annotations
 
 import logging
 import threading
-import time
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
-from .frequency import freq_to_band, from_spot_freq, from_tens_hz
+from .frequency import freq_to_band, from_spot_freq
 from .models import (
     Contact,
     LookupState,
@@ -165,7 +164,6 @@ class StationState:
 
     def evict_stale_spots(self) -> None:
         """Remove spots older than TTL from the spot_map (Patton P2)."""
-        now = time.monotonic()
         cutoff = datetime.now(timezone.utc).timestamp() - self.spot_ttl
         with self.spot_lock:
             stale = [
