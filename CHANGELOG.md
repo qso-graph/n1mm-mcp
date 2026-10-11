@@ -5,7 +5,7 @@ All notable changes to `n1mm-mcp` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.1] — 2026-10-11
 
 - **`n1mm_so2r` says what span its timing covers** (#21). `timing` now carries `from_utc`, the
   timestamp of the oldest RadioInfo packet still held, and `truncated` with a sentence explaining
