@@ -3,8 +3,6 @@
 CodeQL py/bind-socket-all-network-interfaces: the listener bound 0.0.0.0 by default.
 """
 
-import socket
-
 from n1mm_mcp.listener import UDPListener
 from n1mm_mcp.state import StateEngine
 

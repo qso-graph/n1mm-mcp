@@ -161,7 +161,7 @@ class ScoreState:
     grid6: str = ""
 
     # Per-band breakdown: {("160", "CW"): 5, ("80", "CW"): 23, ...}
-    band_mode_qsos: dict = field(default_factory=dict)
+    band_mode_qsos: dict[tuple[str, str], int] = field(default_factory=dict)
 
     station_name: str = ""
     received_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))

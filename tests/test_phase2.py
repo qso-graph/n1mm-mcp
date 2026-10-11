@@ -77,6 +77,36 @@ def test_so2r_timing_swaps_and_qsos(engine):
     assert q["run_by_radio"] == {"radio_1": 2, "radio_2": 0}
 
 
+def test_so2r_timing_says_what_span_it_covers(engine):
+    """#21: the figures start where the retained history starts, and say so."""
+    so2r_station(engine)
+    t = analysis.so2r(engine.resolve_station("SO2R").snapshot(), at(30))["timing"]
+    # The first RadioInfo this station sent, which is where the shares begin.
+    assert t["from_utc"] == T0.isoformat()
+    assert t["truncated"] is False
+    assert "since from_utc" in t["truncated_note"]
+
+
+def test_so2r_timing_says_so_when_the_history_has_wrapped(engine, monkeypatch):
+    """#21: a full history means the oldest packets are gone, and a share read
+    then is not a contest total. Reported when the history is full, because a
+    full deque and one that has just dropped a packet look the same from here.
+
+    The real bound is 50,000 packets — roughly 40 to 70 hours of two radios —
+    so it is lowered here rather than generated.
+    """
+    monkeypatch.setattr(analysis, "DEFAULT_MAX_RADIO_EVENTS", 6)
+    engine.handle_appinfo("W", StationInfo(contest_name="CQWWCW", station_name="W", mycall="K7XX"))
+    for k in range(3):  # three packets per radio: six events, the lowered bound
+        engine.handle_radioinfo("W", radio(1, 14.025, k, running=True, tx=True))
+        engine.handle_radioinfo("W", radio(2, 7.010, k))
+    t = analysis.so2r(engine.resolve_station("W").snapshot(), at(3))["timing"]
+    assert t["truncated"] is True
+    assert "not at the start of the contest" in t["truncated_note"]
+    # Still reports where it starts, so the share can be read against something.
+    assert t["from_utc"] == T0.isoformat()
+
+
 def test_so2r_gaps_longer_than_the_cap_are_not_air_time(engine):
     engine.handle_radioinfo("S", radio(1, 14.0, 0, tx=True))
     engine.handle_radioinfo("S", radio(2, 7.0, 0))

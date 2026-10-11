@@ -5,6 +5,43 @@ All notable changes to `n1mm-mcp` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] — 2026-10-11
+
+- **`n1mm_so2r` says what span its timing covers** (#21). `timing` now carries `from_utc`, the
+  timestamp of the oldest RadioInfo packet still held, and `truncated` with a sentence explaining
+  it. N1MM sends a RadioInfo packet per radio every ten seconds plus one on every change, so two
+  radios fill the 50,000-packet history in roughly 40 to 70 hours and the oldest then drop off.
+  Transmit share, minutes per band and focus swaps were computed over whatever was left, and
+  nothing in the output said so — a share read at hour 40 of a 48-hour contest looked like the
+  whole contest. `truncated` is reported when the history is full rather than when a drop is
+  observed, because from here those are the same thing, and erring towards "these figures are
+  partial" is the safe direction for a number somebody reads as a total.
+
+- **ruff and mypy run in CI** (qso-graph-devel#66), as a job the `ci-all-green` gate requires.
+  Settings follow `adif-mcp`, the reference for every qso-graph Python repo, rather than a style of
+  this repo's own. They run once rather than per Python version: both read the source, and neither
+  answer changes with the interpreter.
+- `n1mm_so2r`'s transmit and per-band times are kept in `defaultdict(float)` rather than `Counter`.
+  They accumulate seconds, and a `Counter` types its values as integers; the `most_common()` call
+  that was the reason for reaching for one is written out as the sort it performs, which orders the
+  same way for ties.
+- `evict_stale_spots` no longer reads the monotonic clock it never used; it compares against a
+  wall-clock cutoff.
+- Nine unused imports removed, `ScoreState.band_mode_qsos` says what it holds, `_score_view` and
+  the spot list name their types, and the listener a run chooses is one name declared to be either
+  kind rather than two branch-local imports a checker reads as a reassignment.
+- `E501` is deferred rather than adopted (qso-graph-devel#70): what it reports in these repos are
+  widths, not defects, and some lines are long because they name a publisher's field exactly.
+- **`fastmcp` is bounded: `>=4.0,<5`** (qso-graph-devel#60). It was `>=3.0` with no upper bound, and
+  these servers are run with `uvx`, which resolves fresh — so a `fastmcp` 5.0 would have reached
+  every user automatically, before anything here had been run against it. The floor rises to 4.0
+  because that is what is actually tested: every lock in the fleet held a 4.x, and nothing in CI
+  has ever exercised 3.x. A claim of 3.x support that no test backs is not support.
+- `fastmcp` is locked at 4.1.0, the current release, so CI runs against what a new install gets.
+- **The published contact is `maintainers@qso-graph.io`** (qso-graph-devel#69). The `authors` field
+  carried a personal address, and that field is what PyPI shows on the package page. Everything in
+  qso-graph is open source and open to contribution, so the contact is the project's.
+
 ## [0.2.0] — 2026-10-06
 
 - **Three new tools for two radios, networked stations and DXpeditions** (#9).
