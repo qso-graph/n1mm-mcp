@@ -5,7 +5,10 @@ All notable changes to `n1mm-mcp` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.3.0] — 2026-10-19
+
+The minor version moves because two things a caller may have relied on now behave
+differently.
 
 **Upgrading:** a tool that fails now returns `isError: true` instead of a successful result whose
 payload carried an `error` key. Two shapes change, and the second is the one to read:
@@ -17,20 +20,6 @@ payload carried an `error` key. Two shapes change, and the second is the one to 
   the caller has to pick from, so an error saying only "specify station_name" would have been
   worse than the payload it replaced. Anything reading `result["stations"]` should read the
   message, or pass `station_name` and avoid the refusal entirely.
-
-### Lint (#28, qso-graph-devel#70)
-
-- **`E501` is adopted.** It reported **31 lines** and not one was a defect — the finding, not an
-  argument against enforcing it. The rules that do find defects (`F`, `I`, mypy strict) went in
-  first, which is why this waited.
-- **No line is exempt**, and none needed to be: there is no `# noqa: E501` in the repo. Most of
-  the 31 were test fixtures calling `handle_appinfo` / `handle_contactinfo` with long keyword
-  lists, which wrap at commas with every value intact.
-- **Nothing moved on the wire.** Every tool's description and `inputSchema` was dumped through a
-  real client before and after: byte-identical. Worth checking rather than assuming — netlogger-
-  mcp's E501 pass did change two parameter descriptions, because an `Args:` line was reflowed
-  there.
-- Falsified: a long line planted in `src/` and another in `tests/`, both caught.
 
 ### MCP specification 2026-07-28 (#29)
 
@@ -62,6 +51,20 @@ payload carried an `error` key. Two shapes change, and the second is the one to 
 - One check reads the source rather than calling tools: no `"error":` payload may remain anywhere
   in the package. A test that called every tool in every failing configuration would miss the path
   nobody thought of, which is exactly what happened to the nine station-choice sites.
+
+### Lint (#28, qso-graph-devel#70)
+
+- **`E501` is adopted.** It reported **31 lines** and not one was a defect — the finding, not an
+  argument against enforcing it. The rules that do find defects (`F`, `I`, mypy strict) went in
+  first, which is why this waited.
+- **No line is exempt**, and none needed to be: there is no `# noqa: E501` in the repo. Most of
+  the 31 were test fixtures calling `handle_appinfo` / `handle_contactinfo` with long keyword
+  lists, which wrap at commas with every value intact.
+- **Nothing moved on the wire.** Every tool's description and `inputSchema` was dumped through a
+  real client before and after: byte-identical. Worth checking rather than assuming — netlogger-
+  mcp's E501 pass did change two parameter descriptions, because an `Args:` line was reflowed
+  there.
+- Falsified: a long line planted in `src/` and another in `tests/`, both caught.
 
 ### Not applicable here
 
