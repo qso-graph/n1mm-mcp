@@ -10,9 +10,10 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, NoReturn
 
 from fastmcp import FastMCP
+from fastmcp.exceptions import ToolError
 
 from . import __spec_version__, __version__, analysis
 from .frequency import freq_to_band, from_spot_freq, from_tens_hz
@@ -38,6 +39,38 @@ mcp = FastMCP(
 _state: StateEngine | None = None
 
 
+# MCP 2026-07-28 tool annotations. The defaults are pessimistic — a tool that
+# declares nothing is advertised as destructive, non-idempotent and open-world, and
+# the specification tells a client it may keep a human in the loop for an operation
+# like that.
+#
+# Unlike netlogger-mcp and omiss-mcp, every tool here really is read-only: this
+# server listens to N1MM's UDP broadcast and writes nothing anywhere, which was
+# checked rather than taken from the issue.
+_READS_N1MM = {
+    "readOnlyHint": True,
+    "destructiveHint": False,
+    # Two identical calls a second apart can differ, because a contest is in
+    # progress and N1MM keeps broadcasting. Idempotent is about the tool not
+    # changing state, not about the answer being stable, so this is still true.
+    "idempotentHint": True,
+    # A judgement, recorded so it can be revisited rather than rediscovered:
+    # true. N1MM is another program, outside this process, whose contents are a
+    # live contest log we neither control nor can enumerate in advance. It is not
+    # the open internet — the packets arrive over UDP on the local network — but
+    # the spec's distinction is a closed domain versus an open one, and a contest
+    # in progress is not a closed domain.
+    "openWorldHint": True,
+}
+_ANSWERS_FROM_THE_PACKAGE = {
+    "readOnlyHint": True,
+    "destructiveHint": False,
+    "idempotentHint": True,
+    # Reports versions carried in the wheel. It opens no socket.
+    "openWorldHint": False,
+}
+
+
 def _get_state() -> StateEngine:
     global _state
     if _state is None:
@@ -45,13 +78,22 @@ def _get_state() -> StateEngine:
     return _state
 
 
-def _station_error(names: list[str]) -> dict[str, Any]:
-    """Error for ambiguous station_name (Einstein MANDATORY #2)."""
-    return {
-        "error": "multiple_stations",
-        "stations": names,
-        "message": "Multiple stations detected. Specify station_name parameter.",
-    }
+def _no_station_chosen(names: list[str]) -> NoReturn:
+    """Ambiguous station_name (Einstein MANDATORY #2), raised rather than returned.
+
+    This was a *successful* result carrying error: "multiple_stations" and a
+    `stations` list. The specification is explicit that a tool's refusal belongs in
+    the result with `isError: true`, because otherwise "the LLM would not be able to
+    see that an error occurred and self-correct".
+
+    The station names are the whole point of this response — they are the choices the
+    caller has to pick from — so they go into the message. A flagged error that said
+    only "specify station_name" would be worse than the payload it replaced.
+    """
+    raise ToolError(
+        f"Multiple N1MM stations are reporting: {', '.join(names)}. "
+        "Pass station_name with one of those to choose which to query."
+    )
 
 
 def _score_view(state: Any, station: Any) -> dict[str, Any] | None:
@@ -118,7 +160,7 @@ def _version_info_payload() -> dict[str, Any]:
     }
 
 
-@mcp.tool()
+@mcp.tool(annotations=_ANSWERS_FROM_THE_PACKAGE)
 def get_version_info() -> dict[str, Any]:
     """Get n1mm-mcp service version and upstream UDP contract version.
 
@@ -141,7 +183,7 @@ def get_version_info() -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Tool 1: n1mm_current_state — Station Snapshot
 # ---------------------------------------------------------------------------
-@mcp.tool()
+@mcp.tool(annotations=_READS_N1MM)
 def n1mm_current_state(station_name: str | None = None) -> dict[str, Any]:
     """Complete station snapshot — connection, contest, operator, radios.
 
@@ -155,7 +197,7 @@ def n1mm_current_state(station_name: str | None = None) -> dict[str, Any]:
         names = state.get_station_names()
         if not names:
             return _disconnected_error()
-        return _station_error(names)
+        _no_station_chosen(names)
 
     with station.radio_lock:
         result: dict[str, Any] = {
@@ -198,7 +240,7 @@ def n1mm_current_state(station_name: str | None = None) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Tool 2: n1mm_lookup — Pre-Log Callsign (Contest-Copilot Trigger)
 # ---------------------------------------------------------------------------
-@mcp.tool()
+@mcp.tool(annotations=_READS_N1MM)
 def n1mm_lookup(station_name: str | None = None) -> dict[str, Any]:
     """Pre-log callsign lookup — THE Contest-Copilot trigger.
 
@@ -212,7 +254,7 @@ def n1mm_lookup(station_name: str | None = None) -> dict[str, Any]:
         names = state.get_station_names()
         if not names:
             return _disconnected_error()
-        return _station_error(names)
+        _no_station_chosen(names)
 
     with station.lookup_lock:
         lookup = station.lookup_state
@@ -256,7 +298,7 @@ def n1mm_lookup(station_name: str | None = None) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Tool 3: n1mm_contacts — QSO Log & History
 # ---------------------------------------------------------------------------
-@mcp.tool()
+@mcp.tool(annotations=_READS_N1MM)
 def n1mm_contacts(
     count: int = 10,
     since: str | None = None,
@@ -284,7 +326,7 @@ def n1mm_contacts(
         names = state.get_station_names()
         if not names:
             return _disconnected_error()
-        return _station_error(names)
+        _no_station_chosen(names)
 
     count = min(max(count, 1), 100)
 
@@ -391,7 +433,7 @@ def n1mm_contacts(
 # ---------------------------------------------------------------------------
 # Tool 4: n1mm_bandmap — Live Spots & Mult Targets
 # ---------------------------------------------------------------------------
-@mcp.tool()
+@mcp.tool(annotations=_READS_N1MM)
 def n1mm_bandmap(
     band: str | None = None,
     mode: str | None = None,
@@ -417,7 +459,7 @@ def n1mm_bandmap(
         names = state.get_station_names()
         if not names:
             return _disconnected_error()
-        return _station_error(names)
+        _no_station_chosen(names)
 
     with station.spot_lock:
         spots = list(station.spot_map.values())
@@ -476,7 +518,7 @@ def n1mm_bandmap(
 # ---------------------------------------------------------------------------
 # Tool 5: n1mm_performance — Rate, Bands & Strategy
 # ---------------------------------------------------------------------------
-@mcp.tool()
+@mcp.tool(annotations=_READS_N1MM)
 def n1mm_performance(
     band: str | None = None,
     mode: str | None = None,
@@ -499,7 +541,7 @@ def n1mm_performance(
         names = state.get_station_names()
         if not names:
             return _disconnected_error()
-        return _station_error(names)
+        _no_station_chosen(names)
 
     now = datetime.now(timezone.utc)
 
@@ -626,7 +668,7 @@ def n1mm_performance(
 # ---------------------------------------------------------------------------
 # Tool 6: n1mm_multipliers — Mult Grid & Needs
 # ---------------------------------------------------------------------------
-@mcp.tool()
+@mcp.tool(annotations=_READS_N1MM)
 def n1mm_multipliers(
     band: str | None = None,
     station_name: str | None = None,
@@ -646,7 +688,7 @@ def n1mm_multipliers(
         names = state.get_station_names()
         if not names:
             return _disconnected_error()
-        return _station_error(names)
+        _no_station_chosen(names)
 
     with station.contact_lock:
         log = station.contact_log
@@ -746,7 +788,7 @@ def n1mm_multipliers(
 # ---------------------------------------------------------------------------
 # Tool 7: n1mm_clock — Contest Timing & Pacing
 # ---------------------------------------------------------------------------
-@mcp.tool()
+@mcp.tool(annotations=_READS_N1MM)
 def n1mm_clock(
     duration_hours: float | None = None,
     target_score: int | None = None,
@@ -769,7 +811,7 @@ def n1mm_clock(
         names = state.get_station_names()
         if not names:
             return _disconnected_error()
-        return _station_error(names)
+        _no_station_chosen(names)
 
     now = datetime.now(timezone.utc)
     view = _score_view(state, station)  # before contact_lock: it takes station locks
@@ -879,7 +921,7 @@ def n1mm_clock(
 # ---------------------------------------------------------------------------
 # Phase 2 (#9): SO2R, networked stations, DXpedition pileups
 # ---------------------------------------------------------------------------
-@mcp.tool()
+@mcp.tool(annotations=_READS_N1MM)
 def n1mm_so2r(station_name: str | None = None) -> dict[str, Any]:
     """Two-radio (SO2R) view: both radios now, and how they've been used.
 
@@ -897,11 +939,11 @@ def n1mm_so2r(station_name: str | None = None) -> dict[str, Any]:
         names = state.get_station_names()
         if not names:
             return _disconnected_error()
-        return _station_error(names)
+        _no_station_chosen(names)
     return analysis.so2r(station.snapshot(), datetime.now(timezone.utc))
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READS_N1MM)
 def n1mm_network() -> dict[str, Any]:
     """Every networked N1MM station at once (multi-op).
 
@@ -938,7 +980,7 @@ def n1mm_network() -> dict[str, Any]:
     return result
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READS_N1MM)
 def n1mm_pileup(window_minutes: int = 60, station_name: str | None = None) -> dict[str, Any]:
     """DXpedition pileup view: rate, who's calling, dupes, split, dead air.
 
@@ -953,21 +995,21 @@ def n1mm_pileup(window_minutes: int = 60, station_name: str | None = None) -> di
         station_name: Station to query.
     """
     if not isinstance(window_minutes, int) or not 5 <= window_minutes <= 1440:
-        return {"error": "invalid_window", "message": "window_minutes must be 5 to 1440."}
+        raise ToolError("window_minutes must be 5 to 1440.")
     state = _get_state()
     station = state.resolve_station(station_name)
     if station is None:
         names = state.get_station_names()
         if not names:
             return _disconnected_error()
-        return _station_error(names)
+        _no_station_chosen(names)
     return analysis.pileup(station.snapshot(), datetime.now(timezone.utc), window_minutes)
 
 
 # ---------------------------------------------------------------------------
 # Tool 8: n1mm_diagnostics — Health & Debug (Patton P1)
 # ---------------------------------------------------------------------------
-@mcp.tool()
+@mcp.tool(annotations=_READS_N1MM)
 def n1mm_diagnostics(station_name: str | None = None) -> dict[str, Any]:
     """Server health and diagnostics — connection, parse errors, memory.
 
