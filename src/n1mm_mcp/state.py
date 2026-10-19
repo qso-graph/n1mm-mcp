@@ -198,7 +198,8 @@ class StationState:
     def reset_contest_state(self) -> None:
         """Reset state on contest name change (Patton P0).
 
-        Clears contacts, spots, mults and the radio history — preserves station_info. The score is held per
+        Clears contacts, spots, mults and the radio history — preserves
+        station_info. The score is held per
         contest call (StateEngine) and is only shown for the contest it reports.
         """
         with self.radio_lock:

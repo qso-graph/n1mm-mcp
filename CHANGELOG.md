@@ -18,6 +18,20 @@ payload carried an `error` key. Two shapes change, and the second is the one to 
   worse than the payload it replaced. Anything reading `result["stations"]` should read the
   message, or pass `station_name` and avoid the refusal entirely.
 
+### Lint (#28, qso-graph-devel#70)
+
+- **`E501` is adopted.** It reported **31 lines** and not one was a defect — the finding, not an
+  argument against enforcing it. The rules that do find defects (`F`, `I`, mypy strict) went in
+  first, which is why this waited.
+- **No line is exempt**, and none needed to be: there is no `# noqa: E501` in the repo. Most of
+  the 31 were test fixtures calling `handle_appinfo` / `handle_contactinfo` with long keyword
+  lists, which wrap at commas with every value intact.
+- **Nothing moved on the wire.** Every tool's description and `inputSchema` was dumped through a
+  real client before and after: byte-identical. Worth checking rather than assuming — netlogger-
+  mcp's E501 pass did change two parameter descriptions, because an `Args:` line was reflowed
+  there.
+- Falsified: a long line planted in `src/` and another in `tests/`, both caught.
+
 ### MCP specification 2026-07-28 (#29)
 
 - **Tool errors are flagged `isError`.** Two error returns in `src/` arrived on the wire as

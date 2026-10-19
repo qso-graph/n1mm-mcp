@@ -173,7 +173,9 @@ def so2r(snap: dict[str, Any], now: datetime) -> dict[str, Any]:
         "by_radio": {f"radio_{nr}": per_radio.get(nr, 0) for nr in seen},
         "pct_by_radio": {f"radio_{nr}": _pct(per_radio.get(nr, 0), total) for nr in seen},
         "run_by_radio": {
-            f"radio_{nr}": sum(1 for c in contacts if c.radio_nr == nr and c.is_run_qso) for nr in seen
+            f"radio_{nr}": sum(1 for c in contacts
+                               if c.radio_nr == nr and c.is_run_qso)
+            for nr in seen
         },
         "while_other_radio_running": {f"radio_{nr}": overlap.get(nr, 0) for nr in seen},
     }
@@ -247,9 +249,11 @@ def network(snaps: list[dict[str, Any]], now: datetime) -> dict[str, Any]:
             b = _band(r)
             if b == "unknown":
                 continue
-            on.setdefault(b, []).append({"station_name": s["station_name"], "radio": nr, "mode": r.mode})
+            on.setdefault(b, []).append({"station_name": s["station_name"],
+                                         "radio": nr, "mode": r.mode})
     same_band_mode = [
-        {"band": b, "mode": m, "stations": sorted({x["station_name"] for x in xs if x["mode"] == m})}
+        {"band": b, "mode": m,
+         "stations": sorted({x["station_name"] for x in xs if x["mode"] == m})}
         for b, xs in sorted(on.items())
         for m in sorted({x["mode"] for x in xs})
         if len({x["station_name"] for x in xs if x["mode"] == m}) > 1
@@ -332,12 +336,14 @@ def pileup(snap: dict[str, Any], now: datetime, window_minutes: int) -> dict[str
             "last_60m": _rate(contacts, now, 60),
             "peak_10m_in_window": peak,
         },
-        "by_continent": {k: {"qsos": v, "pct": _pct(v, n)} for k, v in continents.most_common()},
+        "by_continent": {k: {"qsos": v, "pct": _pct(v, n)}
+                         for k, v in continents.most_common()},
         "top_countries": [{"prefix": k, "qsos": v} for k, v in countries.most_common(10)],
         "by_band_mode": dict(band_mode.most_common()),
         "dead_air": {
             "minutes_since_last_qso": (
-                round((now - contacts[-1].received_at).total_seconds() / 60, 1) if contacts else None
+                round((now - contacts[-1].received_at).total_seconds() / 60, 1)
+                if contacts else None
             ),
             "gaps_over_2m": len(gaps),
             "longest": gaps[:5],
@@ -351,7 +357,8 @@ def pileup(snap: dict[str, Any], now: datetime, window_minutes: int) -> dict[str
             "rx_mhz": from_tens_hz(active.freq_hz),
             "tx_mhz": from_tens_hz(active.tx_freq_hz),
             "up_khz": (
-                round((active.tx_freq_hz - active.freq_hz) / 100, 1) if active.is_split else 0.0
+                round((active.tx_freq_hz - active.freq_hz) / 100, 1)
+                if active.is_split else 0.0
             ),
         }
     return result
