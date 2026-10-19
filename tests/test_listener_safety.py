@@ -25,7 +25,8 @@ def test_entity_expansion_is_refused():
     """A "billion laughs" packet is dropped as a parse error, not expanded."""
     bomb = (
         b'<?xml version="1.0"?><!DOCTYPE contactinfo [<!ENTITY a "aaaaaaaaaa">'
-        b'<!ENTITY b "&a;&a;&a;&a;&a;&a;&a;&a;&a;&a;">]><contactinfo><call>&b;</call></contactinfo>'
+        b'<!ENTITY b "&a;&a;&a;&a;&a;&a;&a;&a;&a;&a;">]>'
+        b'<contactinfo><call>&b;</call></contactinfo>'
     )
     state = StateEngine()
     UDPListener(state)._process_packet(bomb)

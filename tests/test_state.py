@@ -206,7 +206,8 @@ class TestScoreTotal:
         engine = _engine()
         engine.handle_radioinfo("RUN", RadioState(radio_nr=1, mycall="W1AW"))
         for i, f in enumerate((350000, 350100, 1400000, 700000)):
-            engine.handle_contactinfo("RUN", Contact(call=f"K{i}AA", rxfreq=f, mode="CW", guid=str(i)))
+            engine.handle_contactinfo("RUN", Contact(call=f"K{i}AA", rxfreq=f,
+                                                     mode="CW", guid=str(i)))
         engine.handle_score("W1AW", ScoreState(contest="CQWWCW", call="W1AW", score=12,
                                                band_mode_qsos=dict(self.DOC_BREAKDOWN)))
         srv._state = engine
@@ -222,12 +223,19 @@ class TestMultiOpScore:
     def _two_stations(self) -> StateEngine:
         engine = _engine()
         for name in ("RUN", "MULT"):
-            engine.handle_appinfo(name, StationInfo(contest_name="CQWWCW", station_name=name, mycall="K3LR"))
+            engine.handle_appinfo(name, StationInfo(contest_name="CQWWCW",
+                                                    station_name=name,
+                                                    mycall="K3LR"))
             engine.handle_radioinfo(name, RadioState(radio_nr=1, mycall="K3LR"))
-        engine.handle_contactinfo("RUN", Contact(call="W1AW", mycall="K3LR", rxfreq=1400000, mode="CW", guid="a"))
-        engine.handle_contactinfo("MULT", Contact(call="W2AW", mycall="K3LR", rxfreq=700000, mode="CW", guid="b"))
+        engine.handle_contactinfo("RUN", Contact(call="W1AW", mycall="K3LR",
+                                                 rxfreq=1400000, mode="CW",
+                                                 guid="a"))
+        engine.handle_contactinfo("MULT", Contact(call="W2AW", mycall="K3LR",
+                                                  rxfreq=700000, mode="CW",
+                                                  guid="b"))
         engine.handle_score("K3LR", ScoreState(contest="CQWWCW", call="K3LR", score=99,
-                                               band_mode_qsos={("20", "CW"): 1, ("40", "CW"): 1,
+                                               band_mode_qsos={("20", "CW"): 1,
+                                                               ("40", "CW"): 1,
                                                                ("total", "ALL"): 2}))
         return engine
 
@@ -264,13 +272,17 @@ class TestMultiOpScore:
 
     def test_a_score_for_another_contest_is_not_shown(self):
         engine = self._two_stations()
-        engine.handle_appinfo("RUN", StationInfo(contest_name="ARRLDXCW", station_name="RUN", mycall="K3LR"))
+        engine.handle_appinfo("RUN", StationInfo(contest_name="ARRLDXCW",
+                                                 station_name="RUN",
+                                                 mycall="K3LR"))
         assert engine.score_view(engine.resolve_station("RUN")) is None
         assert engine.score_view(engine.resolve_station("MULT"))["score"].score == 99
 
     def test_a_station_known_only_from_contacts_gets_the_score(self):
         engine = _engine()
-        engine.handle_contactinfo("FD-2", Contact(call="W1AW", mycall="w1fd", rxfreq=700000, mode="PH", guid="x"))
+        engine.handle_contactinfo("FD-2", Contact(call="W1AW", mycall="w1fd",
+                                                  rxfreq=700000, mode="PH",
+                                                  guid="x"))
         engine.handle_score("W1FD", ScoreState(contest="ARRL-FD", call="W1FD", score=8))
         assert engine.get_station_names() == ["FD-2"]
         assert engine.score_view(engine.resolve_station("FD-2"))["score"].score == 8

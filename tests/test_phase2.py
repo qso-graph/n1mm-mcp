@@ -3,6 +3,7 @@
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from fastmcp.exceptions import ToolError
 
 import n1mm_mcp.server as srv
 from n1mm_mcp import analysis
@@ -21,13 +22,16 @@ def radio(nr, mhz, minute, running=False, tx=False, active=1, focus=1, mode="CW"
     return RadioState(
         radio_nr=nr, freq_hz=int(round(mhz * 100000)), mode=mode, mycall="K7XX", op_call=op,
         is_running=running, is_transmitting=tx, active_radio_nr=active, focus_radio_nr=focus,
-        is_split=split, tx_freq_hz=int(round((tx_mhz or mhz) * 100000)), received_at=at(minute),
+        is_split=split, tx_freq_hz=int(round((tx_mhz or mhz) * 100000)),
+        received_at=at(minute),
     )
 
 
-def qso(call, mhz, minute, radio_nr=1, run=1, mode="CW", cont="EU", pfx="DL", op="KI7MT", mult=0, guid=None):
+def qso(call, mhz, minute, radio_nr=1, run=1, mode="CW", cont="EU", pfx="DL",
+        op="KI7MT", mult=0, guid=None):
     return Contact(
-        call=call, mycall="K7XX", rxfreq=int(round(mhz * 100000)), mode=mode, radio_nr=radio_nr,
+        call=call, mycall="K7XX", rxfreq=int(round(mhz * 100000)), mode=mode,
+        radio_nr=radio_nr,
         is_run_qso=run, continent=cont, country_prefix=pfx, operator=op, is_multiplier1=mult,
         guid=guid or f"{call}-{minute}", received_at=at(minute),
     )
@@ -46,13 +50,16 @@ def engine():
 
 def so2r_station(e: StateEngine) -> None:
     """30 minutes of RadioInfo every 10 seconds, as N1MM sends it."""
-    e.handle_appinfo("SO2R", StationInfo(contest_name="CQWWCW", station_name="SO2R", mycall="K7XX"))
+    e.handle_appinfo("SO2R", StationInfo(contest_name="CQWWCW",
+                                        station_name="SO2R", mycall="K7XX"))
     for k in range(180):
         m = k / 6
         swapped = 10 <= m < 20  # minutes 10-20: transmit and receive focus on radio 2
         focus = 2 if swapped else 1
         # Radio 1 runs on 20m throughout; it transmits except while radio 2 does.
-        e.handle_radioinfo("SO2R", radio(1, 14.025, m, running=True, tx=not swapped, active=focus, focus=focus))
+        e.handle_radioinfo("SO2R", radio(1, 14.025, m, running=True,
+                                         tx=not swapped, active=focus,
+                                         focus=focus))
         e.handle_radioinfo("SO2R", radio(2, 7.010, m, tx=swapped, active=focus, focus=focus))
     e.handle_contactinfo("SO2R", qso("DL1AA", 14.025, 5, radio_nr=1))
     e.handle_contactinfo("SO2R", qso("F5BB", 7.010, 15, radio_nr=2, run=0))  # radio 1 running
@@ -96,7 +103,8 @@ def test_so2r_timing_says_so_when_the_history_has_wrapped(engine, monkeypatch):
     so it is lowered here rather than generated.
     """
     monkeypatch.setattr(analysis, "DEFAULT_MAX_RADIO_EVENTS", 6)
-    engine.handle_appinfo("W", StationInfo(contest_name="CQWWCW", station_name="W", mycall="K7XX"))
+    engine.handle_appinfo("W", StationInfo(contest_name="CQWWCW",
+                                           station_name="W", mycall="K7XX"))
     for k in range(3):  # three packets per radio: six events, the lowered bound
         engine.handle_radioinfo("W", radio(1, 14.025, k, running=True, tx=True))
         engine.handle_radioinfo("W", radio(2, 7.010, k))
@@ -129,18 +137,23 @@ def test_so2r_with_one_radio_says_so(engine):
 
 def test_so2r_history_is_cleared_on_contest_change(engine):
     so2r_station(engine)
-    engine.handle_appinfo("SO2R", StationInfo(contest_name="ARRLDXCW", station_name="SO2R", mycall="K7XX"))
+    engine.handle_appinfo("SO2R", StationInfo(contest_name="ARRLDXCW",
+                                              station_name="SO2R",
+                                              mycall="K7XX"))
     assert engine.resolve_station("SO2R").snapshot()["radio_events"] == []
 
 
 # ── Network ──────────────────────────────────────────────────────────────────
 
 def network_stations(e: StateEngine) -> None:
-    for name, op, mhz in (("RUN", "N1AA", 14.025), ("MULT", "N2BB", 14.030), ("40M", "N3CC", 7.010)):
-        e.handle_appinfo(name, StationInfo(contest_name="CQWWCW", station_name=name, mycall="K3LR"))
+    for name, op, mhz in (("RUN", "N1AA", 14.025), ("MULT", "N2BB", 14.030),
+                          ("40M", "N3CC", 7.010)):
+        e.handle_appinfo(name, StationInfo(contest_name="CQWWCW",
+                                          station_name=name, mycall="K3LR"))
         e.handle_radioinfo(name, radio(1, mhz, 0, op=op))
     for i in range(6):  # RUN: 6 QSOs on 20m, one 40m QSO before them
-        e.handle_contactinfo("RUN", qso(f"DL{i}AA", 14.025, 70 + i * 5, op="N1AA", mult=1 if i < 2 else 0))
+        e.handle_contactinfo("RUN", qso(f"DL{i}AA", 14.025, 70 + i * 5,
+                                        op="N1AA", mult=1 if i < 2 else 0))
     e.handle_contactinfo("RUN", qso("W1XX", 7.020, 65, op="N1AA"))
     e.handle_contactinfo("40M", qso("JA1AA", 7.010, 10, op="N3CC"))  # last QSO long ago
     e.handle_score("K3LR", ScoreState(contest="CQWWCW", call="K3LR", score=500,
@@ -149,7 +162,9 @@ def network_stations(e: StateEngine) -> None:
 
 def test_network_rows(engine):
     network_stations(engine)
-    r = analysis.network([engine.resolve_station(n).snapshot() for n in ("RUN", "MULT", "40M")], at(100))
+    r = analysis.network(
+        [engine.resolve_station(n).snapshot() for n in ("RUN", "MULT", "40M")],
+        at(100))
     rows = {x["station_name"]: x for x in r["stations"]}
     assert rows["RUN"]["operator"] == "N1AA" and rows["RUN"]["qsos"] == 7
     assert rows["RUN"]["qso_band"] == "20m" and rows["RUN"]["minutes_on_qso_band"] == 30.0
@@ -162,9 +177,12 @@ def test_network_rows(engine):
 
 def test_network_band_sharing_and_operators(engine):
     network_stations(engine)
-    r = analysis.network([engine.resolve_station(n).snapshot() for n in ("RUN", "MULT", "40M")], at(100))
+    r = analysis.network(
+        [engine.resolve_station(n).snapshot() for n in ("RUN", "MULT", "40M")],
+        at(100))
     assert {x["station_name"] for x in r["bands"]["20m"]} == {"RUN", "MULT"}
-    assert r["same_band_and_mode"] == [{"band": "20m", "mode": "CW", "stations": ["MULT", "RUN"]}]
+    assert r["same_band_and_mode"] == [
+        {"band": "20m", "mode": "CW", "stations": ["MULT", "RUN"]}]
     ops = {o["operator"]: o for o in r["operators"]}
     assert ops["N1AA"]["qsos"] == 7 and ops["N1AA"]["last_60m"] == 7
     assert ops["N3CC"]["last_60m"] == 0
@@ -185,13 +203,16 @@ def test_network_with_no_stations(engine):
 # ── Pileup ───────────────────────────────────────────────────────────────────
 
 def pileup_station(e: StateEngine) -> None:
-    e.handle_radioinfo("DX", radio(1, 14.023, 0, running=True, split=True, tx_mhz=14.025, mode="CW"))
-    calls = [("DL1AA", "EU", "DL"), ("JA1BB", "AS", "JA"), ("W1CC", "NA", "K"), ("DL1AA", "EU", "DL"),
+    e.handle_radioinfo("DX", radio(1, 14.023, 0, running=True, split=True,
+                                    tx_mhz=14.025, mode="CW"))
+    calls = [("DL1AA", "EU", "DL"), ("JA1BB", "AS", "JA"), ("W1CC", "NA", "K"),
+             ("DL1AA", "EU", "DL"),
              ("F5DD", "EU", "F"), ("K2EE", "NA", "K")]
     for i, (c, cont, pfx) in enumerate(calls):
         e.handle_contactinfo("DX", qso(c, 14.023, 50 + i, cont=cont, pfx=pfx))
     e.handle_contactinfo("DX", qso("VK3FF", 14.023, 59.5, cont="OC", pfx="VK"))
-    e.handle_contactinfo("DX", qso("ZL2GG", 14.023, 20, cont="OC", pfx="ZL"))  # before a long gap
+    # before a long gap
+    e.handle_contactinfo("DX", qso("ZL2GG", 14.023, 20, cont="OC", pfx="ZL"))
 
 
 def test_pileup(engine):
@@ -209,8 +230,11 @@ def test_pileup(engine):
 
 def test_pileup_window_is_validated(engine):
     pileup_station(engine)
-    assert srv.n1mm_pileup(window_minutes=1)["error"] == "invalid_window"
-    assert srv.n1mm_pileup(window_minutes=5000)["error"] == "invalid_window"
+    # Out-of-range is a flagged error now, not a successful result carrying
+    # error: "invalid_window" (#29).
+    for bad in (1, 5000):
+        with pytest.raises(ToolError, match="window_minutes must be 5 to 1440"):
+            srv.n1mm_pileup(window_minutes=bad)
     assert "qsos" in srv.n1mm_pileup(window_minutes=15)
 
 
