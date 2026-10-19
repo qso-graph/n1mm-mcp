@@ -5,6 +5,55 @@ All notable changes to `n1mm-mcp` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+**Upgrading:** a tool that fails now returns `isError: true` instead of a successful result whose
+payload carried an `error` key. Two shapes change, and the second is the one to read:
+
+- `n1mm_pileup` with an out-of-range `window_minutes` returned
+  `{"error": "invalid_window", ...}`; it now raises with the same message.
+- **An ambiguous station** returned `{"error": "multiple_stations", "stations": [...]}` from nine
+  call sites. It now raises, and **the station names are in the message** — they are the choices
+  the caller has to pick from, so an error saying only "specify station_name" would have been
+  worse than the payload it replaced. Anything reading `result["stations"]` should read the
+  message, or pass `station_name` and avoid the refusal entirely.
+
+### MCP specification 2026-07-28 (#29)
+
+- **Tool errors are flagged `isError`.** Two error returns in `src/` arrived on the wire as
+  successful results, so a client could not tell "the tool answered" from "the tool refused". The
+  specification says of `CallToolResult.isError` that otherwise "the LLM would not be able to see
+  that an error occurred and self-correct".
+- **All 12 tools declare the four annotation hints.** Omitting them advertises a tool as
+  `destructiveHint: true`, `idempotentHint: false`, `openWorldHint: true`.
+- **Every tool here really is read-only**, and that was checked rather than taken from the issue —
+  netlogger-mcp and omiss-mcp both carried the same claim and it was false in both. This package
+  writes nothing anywhere; it listens to N1MM's UDP broadcast.
+- `idempotentHint: true` even though two identical calls a second apart can differ, because a
+  contest is in progress and N1MM keeps broadcasting. The hint is about the tool not changing
+  state, not about the answer being stable. There is a test saying so, because it is the kind of
+  thing a later reader would "correct".
+- `openWorldHint: true` for the eleven tools that read N1MM, and the reasoning is recorded in the
+  code so it can be revisited rather than rediscovered: N1MM is another program, outside this
+  process, whose contents are a live contest log we neither control nor can enumerate. It is not
+  the open internet — UDP on the local network — but the specification's distinction is a closed
+  domain against an open one, and a contest in progress is not closed. `get_version_info` is
+  `false`; it opens no socket.
+- **The ambiguous-station path had no test at all** before this. Nine call sites reached
+  `_station_error` and nothing in the suite exercised any of them, so its shape was free to be
+  anything. `tests/test_mcp_conformance.py` covers it from both sides now: the refusal is flagged
+  and carries every valid station name, and naming one resolves it.
+- Seven falsifications, every one caught — including the refusal keeping its flag but dropping the
+  names, which is the failure that would have quietly made the tool less useful than before.
+- One check reads the source rather than calling tools: no `"error":` payload may remain anywhere
+  in the package. A test that called every tool in every failing configuration would miss the path
+  nobody thought of, which is exactly what happened to the nine station-choice sites.
+
+### Not applicable here
+
+- **No `certifi` work and no issue for it.** This server makes no outbound HTTP call of any kind,
+  so qso-graph-devel#73 does not apply. Verified rather than assumed.
+
 ## [0.2.1] — 2026-10-11
 
 - **`n1mm_so2r` says what span its timing covers** (#21). `timing` now carries `from_utc`, the

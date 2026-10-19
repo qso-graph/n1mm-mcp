@@ -3,6 +3,7 @@
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from fastmcp.exceptions import ToolError
 
 import n1mm_mcp.server as srv
 from n1mm_mcp import analysis
@@ -209,8 +210,11 @@ def test_pileup(engine):
 
 def test_pileup_window_is_validated(engine):
     pileup_station(engine)
-    assert srv.n1mm_pileup(window_minutes=1)["error"] == "invalid_window"
-    assert srv.n1mm_pileup(window_minutes=5000)["error"] == "invalid_window"
+    # Out-of-range is a flagged error now, not a successful result carrying
+    # error: "invalid_window" (#29).
+    for bad in (1, 5000):
+        with pytest.raises(ToolError, match="window_minutes must be 5 to 1440"):
+            srv.n1mm_pileup(window_minutes=bad)
     assert "qsos" in srv.n1mm_pileup(window_minutes=15)
 
 
