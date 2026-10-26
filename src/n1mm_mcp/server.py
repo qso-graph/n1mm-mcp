@@ -9,6 +9,7 @@ Phase 2 (#9): n1mm_so2r, n1mm_network, n1mm_pileup
 from __future__ import annotations
 
 import os
+import sys
 from datetime import datetime, timezone
 from typing import Any, NoReturn
 
@@ -1094,7 +1095,9 @@ def main() -> None:
         "--spot-ttl", type=int, default=DEFAULT_SPOT_TTL // 60, help="Spot TTL in minutes"
     )
     parser.add_argument(
-        "--transport", default="stdio", choices=["stdio", "streamable-http"]
+        "--transport", default="stdio", choices=["stdio", "streamable-http"],
+        help="MCP transport (default: stdio). streamable-http binds "
+             "127.0.0.1 only: not another machine, not a container.",
     )
     parser.add_argument("--list-tools", action="store_true", help="List tools and exit")
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
@@ -1142,6 +1145,13 @@ def main() -> None:
     listener.start()
 
     if args.transport == "streamable-http":
+        # Where it bound, said out loud. FastMCP binds 127.0.0.1 and takes
+        # no host option, so this is never reachable from another machine
+        # or from outside a container. Silent before this line.
+        print(
+            "n1mm-mcp on http://127.0.0.1:8008/mcp - loopback only",
+            file=sys.stderr,
+        )
         mcp.run(transport="streamable-http", port=8008)
     else:
         mcp.run(transport="stdio")
