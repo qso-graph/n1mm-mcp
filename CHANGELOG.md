@@ -5,6 +5,16 @@ All notable changes to `n1mm-mcp` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] — 2026-10-26
+
+- A release should appear on the Releases page
+- Move every Node 20 action to its first Node 24 major
+- The locked-dependency audit blocked every release
+- Four upgrades arrived as 57 pull requests
+- Nothing was auditing the lockfile
+- Close every open security advisory in the lockfile
+- A release is a workflow, not a merge
+
 ## [0.3.0] — 2026-10-19
 
 The minor version moves because two things a caller may have relied on now behave
