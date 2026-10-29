@@ -251,10 +251,26 @@ class UDPListener:
         state: StateEngine,
         port: int = 12060,
         bind_addr: str = "127.0.0.1",
+        allowed_senders: frozenset[str] | None = None,
     ) -> None:
+        """Listen for N1MM on `bind_addr`, accepting only `allowed_senders`.
+
+        `allowed_senders` defaults to this machine over loopback, which is
+        what the default bind serves. It is never empty and there is no
+        "anyone" value: binding to a network address without naming senders
+        is refused before this is constructed (see `server.resolve_listener`).
+        """
         self.state = state
         self.port = port
         self.bind_addr = bind_addr
+        self.allowed_senders = (
+            frozenset({"127.0.0.1"}) if allowed_senders is None else allowed_senders
+        )
+        if not self.allowed_senders:
+            raise ValueError(
+                "allowed_senders is empty, which would accept nothing; "
+                "it must name at least one address"
+            )
         self._sock: socket.socket | None = None
         self._thread: threading.Thread | None = None
         self._stop_event = threading.Event()
@@ -267,7 +283,10 @@ class UDPListener:
             self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
         self._sock.settimeout(1.0)  # allow periodic stop check
         self._sock.bind((self.bind_addr, self.port))
-        logger.info("UDP listener bound to %s:%d", self.bind_addr, self.port)
+        logger.info(
+            "UDP listener bound to %s:%d, accepting %s",
+            self.bind_addr, self.port, ", ".join(sorted(self.allowed_senders)),
+        )
 
         self._thread = threading.Thread(
             target=self._listen_loop, daemon=True, name="n1mm-udp"
@@ -291,6 +310,18 @@ class UDPListener:
                 if self._stop_event.is_set():
                     break
                 raise
+
+            # Who sent it, before a byte of it is read. `addr` was already
+            # being returned here and was discarded, so anything that could
+            # reach the port was parsed as contest state -- on a LAN or on
+            # whatever Wi-Fi the laptop was joined to.
+            #
+            # Dropped unread: not counted as a received packet either, or a
+            # flood of forged datagrams would look like a healthy N1MM feed
+            # to connection_status() while nothing real arrived.
+            if addr[0] not in self.allowed_senders:
+                self.state.record_rejected_sender(addr[0])
+                continue
 
             self.state.record_packet()
             self._process_packet(data)
