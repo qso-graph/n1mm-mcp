@@ -8,7 +8,9 @@ Phase 2 (#9): n1mm_so2r, n1mm_network, n1mm_pileup
 
 from __future__ import annotations
 
+import ipaddress
 import os
+import socket
 import sys
 from datetime import datetime, timezone
 from typing import Any, NoReturn
@@ -1050,6 +1052,11 @@ def n1mm_diagnostics(station_name: str | None = None) -> dict[str, Any]:
         "last_packet_received": last_pkt,
         "last_packet_age_seconds": round(age, 1) if age else None,
         "packets_received_total": state.packets_received,
+        # Dropped because the sender is not on the allow-list. Surfaced
+        # because a listener that silently discards traffic looks exactly
+        # like one hearing nothing, and "N1MM went quiet" and "another
+        # machine is sending to us" need different answers.
+        "dropped_sender_not_allowed": state.rejected_senders(),
         "parse_errors": state.parse_errors.to_dict(),
         "stations_seen": stations,
         "station_details": station_details,
@@ -1061,6 +1068,97 @@ def n1mm_diagnostics(station_name: str | None = None) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+# --- who may send ----------------------------------------------------------
+#
+# Until 0.5.0 the documented way to hear N1MM on another PC was
+# `--bind 0.0.0.0`: every interface at once, and the sender's address was
+# read off the socket and thrown away. Anything that could reach the port was
+# parsed as contest state -- anything on the LAN, or on whatever Wi-Fi a
+# laptop happened to be joined to.
+#
+# The rule here is QSO Graph Desktop's, so the fleet and the app agree:
+# QGD-INT-0005 (the operator names one address, never every interface) and
+# QGD-INT-0006 (who may send is a list, checked before a byte is read).
+
+_BIND_EVERYTHING = frozenset(
+    {"0.0.0.0", "::", "0", "::0", "0:0:0:0:0:0:0:0", "*", ""}
+)
+_LOOPBACK = frozenset({"127.0.0.1", "localhost", "::1"})
+
+
+def own_addresses() -> list[str]:
+    """This machine's own IPv4 addresses, for an error message.
+
+    Best effort: a machine with no resolvable hostname gets an empty list and
+    the message degrades to advice without examples, rather than failing.
+    """
+    try:
+        _, _, addrs = socket.gethostbyname_ex(socket.gethostname())
+    except OSError:
+        return []
+    return sorted(a for a in addrs if not a.startswith("127."))
+
+
+def resolve_listener(
+    bind: str, allow: list[str] | None
+) -> tuple[str, frozenset[str]]:
+    """The address to listen on and the senders to accept, or ValueError.
+
+    Separate from `main` so the rules can be tested without a socket.
+    """
+    bind = (bind or "").strip()
+
+    if bind.lower() in _BIND_EVERYTHING:
+        mine = own_addresses()
+        example = mine[0] if mine else "192.168.1.50"
+        raise ValueError(
+            f"--bind {bind or '(empty)'} would listen on every network "
+            "interface at once, which is more than you need and cannot be "
+            "narrowed afterwards.\n"
+            "Name the one address of this PC that N1MM can reach"
+            + (f" (this PC: {', '.join(mine)})" if mine else "")
+            + ",\n"
+            f"and name who may send:\n"
+            f"  n1mm-mcp --bind {example} --allow <the PC running N1MM>\n"
+            "Or leave --bind unset for N1MM on this PC."
+        )
+
+    allow = [a.strip() for a in (allow or []) if a and a.strip()]
+    for a in allow:
+        try:
+            ipaddress.ip_address(a)
+        except ValueError:
+            raise ValueError(
+                f"--allow {a} is not an IP address. Names are not accepted: "
+                "the check runs on every datagram, and resolving a name then "
+                "would make who is trusted depend on DNS at that moment."
+            ) from None
+
+    if bind.lower() in _LOOPBACK:
+        # Loopback already cannot be reached from another machine; the list is
+        # this machine, plus anything the operator named explicitly.
+        return "127.0.0.1", frozenset({"127.0.0.1", *allow})
+
+    try:
+        ipaddress.ip_address(bind)
+    except ValueError:
+        raise ValueError(
+            f"--bind {bind} is not an IP address. Give one address of this PC, "
+            "or leave it unset for N1MM on this PC."
+        ) from None
+
+    if not allow:
+        raise ValueError(
+            f"--bind {bind} listens on a network, so --allow is required: "
+            "name each PC that may send.\n"
+            f"  n1mm-mcp --bind {bind} --allow 192.168.1.40\n"
+            "Repeat --allow for more than one. There is no value meaning "
+            "anyone -- on a network that is what this flag exists to prevent."
+        )
+
+    return bind, frozenset(allow)
+
+
 def main() -> None:
     """CLI entry point for n1mm-mcp."""
     import argparse
@@ -1074,7 +1172,15 @@ def main() -> None:
     parser.add_argument(
         "-b", "--bind", default="127.0.0.1",
         help="Address to listen on (default 127.0.0.1: N1MM on this PC). "
-             "0.0.0.0 listens on every network interface, for N1MM on another PC.",
+             "For N1MM on another PC, give one address of THIS PC and name "
+             "who may send with --allow. Every interface at once (0.0.0.0) "
+             "is refused.",
+    )
+    parser.add_argument(
+        "--allow", action="append", metavar="ADDR",
+        help="An address that may send to us; repeatable. Required when "
+             "--bind is a network address. Datagrams from anyone else are "
+             "dropped unread and counted (see n1mm_diagnostics).",
     )
     parser.add_argument(
         "--heartbeat-timeout",
@@ -1103,6 +1209,13 @@ def main() -> None:
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
 
     args = parser.parse_args()
+
+    # Before a socket, and before the state engine: a refusal here should
+    # leave nothing started and say what to run instead.
+    try:
+        bind_addr, allowed_senders = resolve_listener(args.bind, args.allow)
+    except ValueError as e:
+        parser.exit(2, f"{parser.prog}: {e}\n")
 
     if args.list_tools:
         tools = [
@@ -1140,7 +1253,12 @@ def main() -> None:
     if is_mock:
         listener = MockListener(_state)
     else:
-        listener = UDPListener(_state, port=args.port, bind_addr=args.bind)
+        listener = UDPListener(
+            _state,
+            port=args.port,
+            bind_addr=bind_addr,
+            allowed_senders=allowed_senders,
+        )
 
     listener.start()
 

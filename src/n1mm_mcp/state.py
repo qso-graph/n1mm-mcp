@@ -254,6 +254,20 @@ class StateEngine:
         self.last_packet_at: datetime | None = None
         self.started_at: datetime = datetime.now(timezone.utc)
 
+        # Datagrams dropped because the sender was not on the allow-list.
+        # Counted and surfaced by n1mm_diagnostics: a listener that silently
+        # discards traffic is indistinguishable from one hearing nothing, and
+        # "N1MM went quiet" and "someone else is sending" need different
+        # answers from the operator.
+        #
+        # The distinct-sender set is capped. A forged flood can carry a
+        # different source address in every datagram, and an uncapped set
+        # would be a memory leak reachable by anyone on the network.
+        self._rejected_lock = threading.Lock()
+        self.rejected_senders_total: int = 0
+        self._rejected_senders: set[str] = set()
+        self._rejected_senders_capped: bool = False
+
     def _get_or_create_station(self, station_name: str) -> StationState:
         with self._stations_lock:
             if station_name not in self._stations:
@@ -268,6 +282,29 @@ class StateEngine:
     def record_packet(self) -> None:
         self.packets_received += 1
         self.last_packet_at = datetime.now(timezone.utc)
+
+    _MAX_REJECTED_SENDERS = 10
+
+    def record_rejected_sender(self, addr: str) -> None:
+        """A datagram was dropped unread because its sender is not allowed.
+
+        Called before any parsing, so nothing about the datagram beyond its
+        sender's address is read, let alone acted on.
+        """
+        with self._rejected_lock:
+            self.rejected_senders_total += 1
+            if len(self._rejected_senders) < self._MAX_REJECTED_SENDERS:
+                self._rejected_senders.add(addr)
+            elif addr not in self._rejected_senders:
+                self._rejected_senders_capped = True
+
+    def rejected_senders(self) -> dict[str, object]:
+        with self._rejected_lock:
+            return {
+                "total": self.rejected_senders_total,
+                "senders": sorted(self._rejected_senders),
+                "more_not_listed": self._rejected_senders_capped,
+            }
 
     def get_station_names(self) -> list[str]:
         with self._stations_lock:

@@ -61,14 +61,33 @@ AI assistant
 
 #### N1MM on another PC
 
-Run n1mm-mcp with `--bind 0.0.0.0` (every network interface) or `--bind <this PC's LAN address>`,
-and point N1MM at it: this PC's address (`192.168.1.20:12060`), or your subnet's broadcast address
+Give **one address of this PC** and name **who may send**:
+
+```bash
+n1mm-mcp --bind 192.168.1.20 --allow 192.168.1.40
+```
+
+Then point N1MM at this PC's address (`192.168.1.20:12060`), or at your subnet's broadcast address
 (`192.168.1.255:12060`) to reach every PC on it. N1MM accepts several destinations separated by
 spaces. Don't use `255.255.255.255`: N1MM's own documentation warns that it risks broadcasting to
 the internet ([N1MM: External UDP Broadcasts](https://n1mmwp.hamdocs.com/appendices/external-udp-broadcasts/)).
 
-Listening on the network means any device on it can send n1mm-mcp packets, so only do it on a
-network you trust.
+`--allow` is **required** whenever `--bind` is a network address, and is repeatable for more than
+one PC. A datagram from any other address is dropped without being read, and counted —
+`n1mm_diagnostics` shows the count and the addresses, so traffic you did not expect is visible
+rather than silent.
+
+**`--bind 0.0.0.0` is refused.** It listened on every interface at once, including whatever Wi-Fi a
+laptop happened to be joined to, and it cannot be narrowed afterwards. Name the interface you mean.
+
+#### What the allow-list does and does not do
+
+A UDP sender's address can be forged by anything on the same network, so the list keeps **other
+machines** out; it is not proof of **who** sent a datagram. What limits the damage is that
+**n1mm-mcp only reads**: it has no tool that writes to N1MM, your log, or anything else. A forged
+packet can therefore mislead you about contest state — a wrong frequency, a spot that was never
+spotted — but it cannot act, and nothing it contains is written anywhere. Treat the state as
+reported, not as verified, and run on a network you trust.
 
 ### Configure your MCP client
 
@@ -179,7 +198,8 @@ Add to `~/.gemini/settings.json` (global) or `.gemini/settings.json` (project):
 | Option | Default | Description |
 |--------|---------|-------------|
 | `--port` | `12060` | UDP listen port |
-| `--bind` | `127.0.0.1` | Address to listen on; `0.0.0.0` for N1MM on another PC |
+| `--bind` | `127.0.0.1` | Address to listen on. One address of this PC; `0.0.0.0` is refused |
+| `--allow` | this PC | An address that may send to us; repeatable. Required with a network `--bind` |
 | `--transport` | `stdio` | MCP transport (`stdio` or `streamable-http`) |
 | `--heartbeat-timeout` | `60` | Seconds before the connection goes stale |
 | `--stale-timeout` | `900` | Seconds before the connection goes disconnected |

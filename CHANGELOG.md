@@ -5,6 +5,48 @@ All notable changes to `n1mm-mcp` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **Who may send is a list, checked before a datagram is read.** The listener
+  read the sender's address off the socket and discarded it, so anything that
+  could reach the port was parsed as contest state. `--allow` names each PC
+  that may send; it is required whenever `--bind` is a network address and is
+  repeatable. A datagram from any other address is dropped unread and counted,
+  and `n1mm_diagnostics` reports the count and the addresses — a listener that
+  silently discards traffic is indistinguishable from one hearing nothing, and
+  those need different answers from the operator.
+
+  The default is unchanged: loopback, accepting this PC.
+
+  Same rule as QSO Graph Desktop's own listener (`QGD-INT-0005`,
+  `QGD-INT-0006`), so the app and the fleet agree rather than each deciding.
+
+### Removed
+
+- **`--bind 0.0.0.0` is refused**, and this is a breaking change for anyone
+  using it. It listened on every interface at once — including whatever Wi-Fi a
+  laptop happened to be joined to — and could not be narrowed afterwards. Give
+  one address of this PC instead:
+
+      n1mm-mcp --bind 192.168.1.20 --allow 192.168.1.40
+
+  The refusal names your PC's own addresses and the command to run.
+
+  The *default* was fixed earlier when CodeQL flagged it
+  (`py/bind-socket-all-network-interfaces`). What survived was this option and
+  the README advice to use it, because CodeQL cannot flag a value supplied at
+  runtime.
+
+### Security
+
+- The README now says plainly that a UDP sender's address can be forged by
+  anything on the same network, so the allow-list keeps other machines out but
+  is not proof of who sent a datagram — and that n1mm-mcp only reads, so a
+  forged packet can mislead about contest state but cannot act, and nothing it
+  carries is written anywhere.
+
 ## [0.4.0] — 2026-10-26
 
 ### Changed
