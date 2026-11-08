@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+
+- README: style fixes for the QSO Graph style guide (Google Developer Documentation Style Guide, American English).
 - **Who may send is a list, checked before a datagram is read.** The listener
   read the sender's address off the socket and discarded it, so anything that
   could reach the port was parsed as contest state. `--allow` names each PC
