@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 
+
+- AGENTS.md and CLAUDE.md: the organization's shared agent guide, and this repository's own.
 - README: style fixes for the QSO Graph style guide (Google Developer Documentation Style Guide, American English).
 - **Who may send is a list, checked before a datagram is read.** The listener
   read the sender's address off the socket and discarded it, so anything that
