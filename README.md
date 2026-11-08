@@ -4,7 +4,7 @@
 [![PyPI](https://img.shields.io/pypi/v/n1mm-mcp?label=PyPI&color=blue)](https://pypi.org/project/n1mm-mcp/)
 [![MCP Registry](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fregistry.modelcontextprotocol.io%2Fv0%2Fservers%3Fsearch%3Dio.github.qso-graph%2Fn1mm-mcp%26version%3Dlatest&query=%24.servers%5B0%5D.server.version&label=MCP%20Registry&color=blue)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.qso-graph/n1mm-mcp&version=latest)
 
-MCP server for [N1MM Logger+](https://n1mm.hamdocs.com/): live contest state — station, QSOs, bandmap, score and rate, multipliers, and contest clock — through any MCP-compatible AI assistant.
+MCP server for [N1MM Logger+](https://n1mm.hamdocs.com/): live contest state—station, QSOs, bandmap, score and rate, multipliers, and contest clock—through any MCP-compatible AI assistant.
 
 Data from N1MM Logger+'s UDP broadcasts on your local network. Part of the [qso-graph](https://qso-graph.io/) project. **No authentication required.**
 
@@ -27,9 +27,9 @@ uvx n1mm-mcp            # run it; nothing to install
 | `n1mm_clock` | Contest timing, off-time, pacing | duration_hours, target_score, target_qsos, min_gap_minutes |
 | `n1mm_diagnostics` | Server health, parse errors, memory | station_name |
 | `n1mm_so2r` | Two radios: each radio now, transmit/receive focus, same-band warning, transmit time and minutes per band, focus swaps, QSOs per radio and while the other radio runs | station_name |
-| `n1mm_network` | Every networked station: operator, radios, rate, idle time, band, shared score per contest call, stations sharing a band and mode, QSOs per operator | — |
+| `n1mm_network` | Every networked station: operator, radios, rate, idle time, band, shared score per contest call, stations sharing a band and mode, QSOs per operator | &mdash; |
 | `n1mm_pileup` | DXpedition pileup: rate, unique calls, dupes, continents and countries calling, split, dead air | window_minutes |
-| `get_version_info` | Service version + upstream spec version (fleet identity attestation) | — |
+| `get_version_info` | Service version + upstream spec version (fleet identity attestation) | &mdash; |
 
 Every tool except `n1mm_network` (which covers all stations) takes an optional `station_name` for multi-station setups.
 
@@ -56,7 +56,7 @@ AI assistant
 ### Turn on N1MM's broadcasts
 
 1. In N1MM: **Config → Configure Ports → Broadcast Data**, and enable all message types.
-2. Set the destination to `127.0.0.1:12060`, N1MM's address for "this PC". n1mm-mcp listens there
+2. Set the destination to `127.0.0.1:12060`, N1MM's address for "this PC." n1mm-mcp listens there
    by default, and nothing outside the PC can reach it.
 
 #### N1MM on another PC
@@ -85,8 +85,8 @@ laptop happened to be joined to, and it cannot be narrowed afterwards. Name the 
 A UDP sender's address can be forged by anything on the same network, so the list keeps **other
 machines** out; it is not proof of **who** sent a datagram. What limits the damage is that
 **n1mm-mcp only reads**: it has no tool that writes to N1MM, your log, or anything else. A forged
-packet can therefore mislead you about contest state — a wrong frequency, a spot that was never
-spotted — but it cannot act, and nothing it contains is written anywhere. Treat the state as
+packet can therefore mislead you about contest state—a wrong frequency, a spot that was never
+spotted—but it cannot act, and nothing it contains is written anywhere. Treat the state as
 reported, not as verified, and run on a network you trust.
 
 ### Configure your MCP client
