@@ -59,9 +59,15 @@ class TestFromSpotFreq:
         """N1MM-L2-011: 14195.0 kHz → 14.1950 MHz."""
         assert from_spot_freq("14195.0") == pytest.approx(14.195, abs=0.0001)
 
-    def test_mhz_input(self):
-        """N1MM-L2-012: 14.195 MHz → 14.1950 MHz."""
-        assert from_spot_freq("14.195") == pytest.approx(14.195, abs=0.0001)
+    def test_low_bands_are_khz(self):
+        """N1MM-L2-012: spots at or below 1000 are kHz too, never MHz.
+
+        Planted: 475.0 read as MHz was 475 MHz and no band at all.
+        """
+        assert from_spot_freq("475.0") == pytest.approx(0.475, abs=0.0001)
+        assert from_spot_freq("137.5") == pytest.approx(0.1375, abs=0.0001)
+        assert freq_to_band(from_spot_freq("475.0")) == "630m"
+        assert freq_to_band(from_spot_freq("137.5")) == "2200m"
 
     def test_zero(self):
         """N1MM-L2-013: 0 → 0.0."""
@@ -125,6 +131,7 @@ class TestFreqToBand:
     def test_all_bands(self):
         """N1MM-L2-026: Representative frequency for each band."""
         cases = [
+            (0.1365, "2200m"), (0.475, "630m"),
             (1.9, "160m"), (3.7, "80m"), (5.35, "60m"), (7.15, "40m"),
             (10.12, "30m"), (14.2, "20m"), (18.1, "17m"), (21.2, "15m"),
             (24.93, "12m"), (28.5, "10m"), (51.0, "6m"),
