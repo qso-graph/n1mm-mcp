@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Spot frequencies at or below 1000 kHz were read as MHz.** N1MM's spot
+  frequency is always kHz, but the unit was guessed from the size, so a 630 m
+  spot (`475.0`) became 475 MHz and a 2200 m spot (`137.5`) 137.5 MHz, neither
+  in any band. Every spot is now divided by 1000, and the band table gains
+  2200 m and 630 m (the ITU allocations).
+
 ### Changed
 
 
