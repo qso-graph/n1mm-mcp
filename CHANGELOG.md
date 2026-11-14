@@ -7,10 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Security
-
-- Locked dependencies: dnspython 2.9.2 (CVE-2026-128089) and
-  opentelemetry-api 1.45.2 (CVE-2026-126360), both transitive.
+## [0.5.0] — 2026-11-13
 
 ### Fixed
 
@@ -21,8 +18,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   2200 m and 630 m (the ITU allocations).
 
 ### Changed
-
-
 
 - AGENTS.md and CLAUDE.md: the organization's shared agent guide, and this repository's own.
 - README: style fixes for the QSO Graph style guide (Google Developer Documentation Style Guide, American English).
@@ -57,6 +52,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   runtime.
 
 ### Security
+
+- Locked dependencies: dnspython 2.9.2 (CVE-2026-128089) and
+  opentelemetry-api 1.45.2 (CVE-2026-126360), both transitive.
 
 - The README now says plainly that a UDP sender's address can be forged by
   anything on the same network, so the allow-list keeps other machines out but
